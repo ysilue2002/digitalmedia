@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Question Live - QDay Anglais</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <label for="lang-switcher" class="meta" data-i18n="lang.short">Langue</label>
+      <select id="lang-switcher" class="lang-switcher">
+        <option value="fr">FR</option>
+        <option value="en">EN</option>
+        <option value="es">ES</option>
+        <option value="ar">AR</option>
+      </select>
+      <a href="/history.html" data-i18n="nav.history">Historique</a>
+      <a href="/index.html" data-i18n="nav.changePseudo">Changer de pseudo</a>
+      <a href="/index.html" class="logout-link" data-i18n="nav.logout">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container grid">
+    <section class="card full">
+      <aside class="ad-banner ad-banner-inline ad-dynamic" data-ad-slot="live-top">
+        <span class="ad-label" data-i18n="ads.label">Publicite</span>
+        <h3 class="ad-title" data-i18n="ads.spaceTitle">Espace publicitaire</h3>
+        <p class="ad-copy" data-i18n="ads.spaceBody">Cet espace est configure par l'administrateur.</p>
+      </aside>
+    </section>
+
+    <section class="card">
+      <h2 data-i18n="live.currentQuestion">Question en cours</h2>
+      <p id="current-question" class="question" data-i18n="common.loading">Chargement...</p>
+
+      <form id="answer-form" class="stack">
+        <label for="answer-text" data-i18n="live.yourAnswer">Ta reponse</label>
+        <textarea id="answer-text" rows="3" maxlength="500" required></textarea>
+        <button type="submit" data-i18n="live.sendAnswer">Envoyer la reponse</button>
+      </form>
+    </section>
+
+    <section class="card full">
+      <h2 data-i18n="live.liveAnswers">Reponses en direct</h2>
+      <div id="answers-list" class="answers"></div>
+    </section>
+
+    <section class="card full">
+      <div class="ad-grid">
+        <aside class="ad-banner ad-tile ad-dynamic" data-ad-slot="live-bottom-left">
+          <span class="ad-label" data-i18n="ads.label">Publicite</span>
+          <h3 class="ad-title" data-i18n="ads.spaceTitle">Espace publicitaire</h3>
+          <p class="ad-copy" data-i18n="ads.spaceBody">Cet espace est configure par l'administrateur.</p>
+        </aside>
+        <aside class="ad-banner ad-tile ad-dynamic" data-ad-slot="live-bottom-right">
+          <span class="ad-label" data-i18n="ads.label">Publicite</span>
+          <h3 class="ad-title" data-i18n="ads.spaceTitle">Espace publicitaire</h3>
+          <p class="ad-copy" data-i18n="ads.spaceBody">Cet espace est configure par l'administrateur.</p>
+        </aside>
+      </div>
+    </section>
+    <section class="card full">
+      <p class="hint">
+        <strong data-i18n="contact.label">Contact</strong> :
+        digitalmediaci@proton.me | digitalmediaci@aol.com
+      </p>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <footer class="site-footer" data-i18n="footer.rights">tous droits reservés à SYM_CI</footer>
+</body>
+</html>

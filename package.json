@@ -1,0 +1,18 @@
+{
+  "name": "qday-anglais",
+  "version": "1.0.0",
+  "description": "Question du jour en temps reel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "express-rate-limit": "^7.5.0",
+    "express": "^4.19.2",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "pg": "^8.13.1",
+    "socket.io": "^4.8.1"
+  }
+}

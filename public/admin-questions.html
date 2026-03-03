@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Gestion des questions</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <a href="/admin-questions.html">Gestion des questions</a>
+      <a href="/admin-pubs.html">Gestion des Pubs</a>
+      <a href="/admin-moderation.html">Moderation</a>
+      <a href="/admin-stats.html">Statistiques</a>
+      <a href="/index.html" class="logout-link">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card" id="questions">
+      <h2>Gestion des questions</h2>
+      <form id="dashboard-question-form" class="stack">
+        <label for="dashboard-question-text-fr">Question du jour (Francais)</label>
+        <textarea id="dashboard-question-text-fr" rows="3" maxlength="500" required></textarea>
+        <label for="dashboard-question-text-en">Question du jour (Anglais)</label>
+        <textarea id="dashboard-question-text-en" rows="3" maxlength="500" required></textarea>
+        <label for="dashboard-question-text-es">Question du jour (Espagnol)</label>
+        <textarea id="dashboard-question-text-es" rows="3" maxlength="500" required></textarea>
+        <label for="dashboard-question-text-ar">Question du jour (Arabe)</label>
+        <textarea id="dashboard-question-text-ar" rows="3" maxlength="500" required dir="rtl"></textarea>
+        <button type="submit">Publier et activer</button>
+      </form>
+      <div id="dashboard-questions" class="answers"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <script src="/admin-dashboard.js"></script>
+</body>
+</html>

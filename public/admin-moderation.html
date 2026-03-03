@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Moderation</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <a href="/admin-questions.html">Gestion des questions</a>
+      <a href="/admin-pubs.html">Gestion des Pubs</a>
+      <a href="/admin-moderation.html">Moderation</a>
+      <a href="/admin-stats.html">Statistiques</a>
+      <a href="/index.html" class="logout-link">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Moderation</h2>
+      <p class="meta">Liste des signalements recents et actions en un clic.</p>
+      <div id="moderation-toolbar" class="moderation-toolbar">
+        <input id="report-search" type="search" placeholder="Recherche instantanee..." />
+        <select id="report-filter-status">
+          <option value="open">Ouverts</option>
+          <option value="all">Tous statuts</option>
+          <option value="resolved">Resolus</option>
+          <option value="dismissed">Ignores</option>
+        </select>
+        <select id="report-filter-type">
+          <option value="all">Tous types</option>
+          <option value="answer">Reponses</option>
+          <option value="comment">Commentaires</option>
+        </select>
+        <select id="report-filter-author">
+          <option value="all">Tous auteurs</option>
+        </select>
+        <select id="report-sort">
+          <option value="date_desc">Date (recent -> ancien)</option>
+          <option value="date_asc">Date (ancien -> recent)</option>
+          <option value="author_asc">Auteur (A -> Z)</option>
+          <option value="type_asc">Type (A -> Z)</option>
+          <option value="status_asc">Statut (A -> Z)</option>
+        </select>
+        <button id="refresh-reports" type="button">Rafraichir</button>
+      </div>
+      <div id="reports-list" class="answers"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>

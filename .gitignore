@@ -1,0 +1,12 @@
+node_modules/
+uploads/
+.env
+.env.*
+data/*.log
+data/app.log
+data/audit.log
+data/traffic-stats.json
+data/store.json
+*.tmp
+.DS_Store
+Thumbs.db

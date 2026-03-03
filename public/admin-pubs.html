@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Gestion des Pubs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <a href="/admin-questions.html">Gestion des questions</a>
+      <a href="/admin-pubs.html">Gestion des Pubs</a>
+      <a href="/admin-moderation.html">Moderation</a>
+      <a href="/admin-stats.html">Statistiques</a>
+      <a href="/index.html" class="logout-link">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card" id="pubs">
+      <h2>Gestion des publicites</h2>
+      <form id="dashboard-ad-form" class="stack">
+        <label for="dashboard-ad-slot">Emplacement</label>
+        <select id="dashboard-ad-slot" required>
+          <option value="login-main">Connexion</option>
+          <option value="live-top">Live haut</option>
+          <option value="live-bottom-left">Live bas gauche</option>
+          <option value="live-bottom-right">Live bas droite</option>
+          <option value="history-left-top">Historique gauche</option>
+          <option value="history-right-bottom">Historique bas droite</option>
+        </select>
+        <label for="dashboard-ad-label">Label</label>
+        <input id="dashboard-ad-label" maxlength="80" value="Publicite" />
+        <label for="dashboard-ad-title">Titre</label>
+        <input id="dashboard-ad-title" maxlength="80" required />
+        <label for="dashboard-ad-copy">Contenu</label>
+        <textarea id="dashboard-ad-copy" rows="3" maxlength="500" required></textarea>
+        <label for="dashboard-ad-start">Debut</label>
+        <input id="dashboard-ad-start" type="datetime-local" required />
+        <label for="dashboard-ad-end">Fin</label>
+        <input id="dashboard-ad-end" type="datetime-local" required />
+        <label for="dashboard-ad-asset">Media (image, video, pdf, autre)</label>
+        <input id="dashboard-ad-asset" type="file" />
+        <div id="dashboard-ad-current-asset" class="meta"></div>
+        <button type="submit">Enregistrer et programmer la pub</button>
+      </form>
+      <hr class="separator" />
+      <div id="dashboard-ads" class="answers"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <script src="/admin-dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Admin - QDay</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container auth-card">
+    <div class="language-strip">
+      <label for="lang-switcher" data-i18n="lang.label">Langue</label>
+      <select id="lang-switcher" class="lang-switcher">
+        <option value="fr">FR</option>
+        <option value="en">EN</option>
+        <option value="es">ES</option>
+        <option value="ar">AR</option>
+      </select>
+    </div>
+    <img src="/logo-qday.svg" alt="QDAY" class="brand-logo brand-logo-main" />
+    <p data-i18n="adminLogin.subtitle">Acces reserve a l'administration.</p>
+
+    <form id="admin-login-form" class="stack">
+      <label for="admin-password" data-i18n="adminLogin.password">Mot de passe admin</label>
+      <input id="admin-password" type="password" autocomplete="current-password" required />
+      <button type="submit" data-i18n="adminLogin.submit">Se connecter en admin</button>
+    </form>
+
+    <p class="hint"><a href="/index.html" data-i18n="adminLogin.backToUser">Retour connexion utilisateur</a></p>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>

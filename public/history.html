@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Historique - QDay Anglais</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <label for="lang-switcher" class="meta" data-i18n="lang.short">Langue</label>
+      <select id="lang-switcher" class="lang-switcher">
+        <option value="fr">FR</option>
+        <option value="en">EN</option>
+        <option value="es">ES</option>
+        <option value="ar">AR</option>
+      </select>
+      <a href="/live.html" data-i18n="nav.live">Live</a>
+      <a href="/index.html" data-i18n="nav.changePseudo">Changer de pseudo</a>
+      <a href="/index.html" class="logout-link" data-i18n="nav.logout">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container history-layout">
+    <section class="card">
+      <aside class="ad-banner ad-banner-inline ad-dynamic" data-ad-slot="history-left-top">
+        <span class="ad-label" data-i18n="ads.label">Publicite</span>
+        <h3 class="ad-title" data-i18n="ads.spaceTitle">Espace publicitaire</h3>
+        <p class="ad-copy" data-i18n="ads.spaceBody">Cet espace est configure par l'administrateur.</p>
+      </aside>
+
+      <h2 data-i18n="history.oldQuestions">Anciennes questions</h2>
+      <div id="history-list" class="history-list"></div>
+    </section>
+
+    <section class="card">
+      <h2 id="selected-title" data-i18n="history.selectQuestion">Selectionne une question</h2>
+      <p id="selected-question" class="question"></p>
+
+      <form id="answer-form" class="stack" hidden>
+        <label for="answer-text" data-i18n="history.intervene">Intervenir sur cette question</label>
+        <textarea id="answer-text" rows="3" maxlength="500" required></textarea>
+        <button type="submit" data-i18n="live.sendAnswer">Envoyer la reponse</button>
+      </form>
+
+      <div id="answers-list" class="answers"></div>
+
+      <aside class="ad-banner ad-dynamic" data-ad-slot="history-right-bottom">
+        <span class="ad-label" data-i18n="ads.label">Publicite</span>
+        <h3 class="ad-title" data-i18n="ads.spaceTitle">Espace publicitaire</h3>
+        <p class="ad-copy" data-i18n="ads.spaceBody">Cet espace est configure par l'administrateur.</p>
+      </aside>
+      <p class="hint">
+        <strong data-i18n="contact.label">Contact</strong> :
+        digitalmediaci@proton.me | digitalmediaci@aol.com
+      </p>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <footer class="site-footer" data-i18n="footer.rights">tous droits reservés à SYM_CI</footer>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Statistiques</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <a href="/live.html" class="brand-link">
+        <img src="/logo-qday.svg" alt="QDAY" class="brand-logo" />
+      </a>
+      <strong id="user-badge"></strong>
+    </div>
+    <nav>
+      <a href="/admin-questions.html">Gestion des questions</a>
+      <a href="/admin-pubs.html">Gestion des Pubs</a>
+      <a href="/admin-moderation.html">Moderation</a>
+      <a href="/admin-stats.html">Statistiques</a>
+      <a href="/index.html" class="logout-link">Deconnexion</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card" id="stats">
+      <h2>Statistiques QDAY</h2>
+      <div id="dashboard-stats-totals" class="answers"></div>
+      <h3>Top pages QDAY</h3>
+      <div id="dashboard-stats-pages" class="answers"></div>
+      <h3>Trafic QDAY par pays/region</h3>
+      <div id="dashboard-stats-geo" class="answers"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+  <script src="/admin-dashboard.js"></script>
+</body>
+</html>
