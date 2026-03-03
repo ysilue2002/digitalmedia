@@ -1012,6 +1012,19 @@ function cleanupExpiredAds(store) {
   return true;
 }
 
+function activateDueScheduledQuestion(store) {
+  const now = Date.now();
+  const due = (store.questions || [])
+    .filter((q) => !q.active && q.activateAt && new Date(q.activateAt).getTime() <= now)
+    .sort((a, b) => new Date(a.activateAt).getTime() - new Date(b.activateAt).getTime());
+  if (!due.length) return false;
+  const target = due[due.length - 1];
+  (store.questions || []).forEach((q) => {
+    q.active = q.id === target.id;
+  });
+  return true;
+}
+
 function broadcastState(store) {
   const current = getCurrentQuestion(store);
   io.emit("current:updated", current ? publicQuestion(current) : null);
@@ -1115,6 +1128,7 @@ app.get("/api/admin/questions", (req, res) => {
       text: questionTextForLang(q, DEFAULT_LANG),
       texts: normalizeQuestionTexts(q.texts, q.text || ""),
       createdAt: q.createdAt,
+      activateAt: q.activateAt || null,
       active: Boolean(q.active),
       answersCount: (q.answers || []).length,
       commentsCount: (q.answers || []).reduce((sum, a) => sum + ((a.comments || []).length || 0), 0),
@@ -1126,25 +1140,38 @@ app.post("/api/admin/questions", (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
   const rawTexts = req.body?.texts && typeof req.body.texts === "object" ? req.body.texts : null;
   const texts = normalizeQuestionTexts(rawTexts);
+  const safeActivateAt = normalizeISODate(req.body?.activateAt);
+  if (req.body?.activateAt && !safeActivateAt) {
+    return res.status(400).json({ error: "Date de programmation invalide." });
+  }
   const missing = SUPPORTED_LANGS.find((lang) => !texts[lang]);
   if (missing) {
     return res.status(400).json({ error: "Chaque question doit etre renseignee en francais, anglais, espagnol et arabe." });
   }
   const store = loadStore();
-  store.questions.forEach((q) => {
-    q.active = false;
-  });
+  const now = Date.now();
+  const isFutureSchedule = safeActivateAt && new Date(safeActivateAt).getTime() > now;
+  if (!isFutureSchedule) {
+    store.questions.forEach((q) => {
+      q.active = false;
+    });
+  }
   const question = {
     id: makeId("q"),
     text: texts[DEFAULT_LANG],
     texts,
     createdAt: new Date().toISOString(),
-    active: true,
+    activateAt: safeActivateAt || null,
+    active: !isFutureSchedule,
     answers: [],
   };
   store.questions.push(question);
   saveStore(store);
-  writeAudit("admin.question_add.success", { ip: getReqIp(req), textFr: texts.fr });
+  writeAudit("admin.question_add.success", {
+    ip: getReqIp(req),
+    textFr: texts.fr,
+    activateAt: safeActivateAt || "immediate",
+  });
   broadcastState(store);
   return res.json({ ok: true, question: publicQuestion(question) });
 });
@@ -1416,7 +1443,7 @@ io.on("connection", (socket) => {
     socket.emit("report:list", publicReports(store));
   }
 
-  socket.on("question:add", ({ texts: payloadTexts }) => {
+  socket.on("question:add", ({ texts: payloadTexts, activateAt }) => {
     if (!allow("question:add", 20, 60_000)) return;
     if (!isAdminSocket(socket)) {
       writeAudit("admin.question_add.denied", { ip: socketIp });
@@ -1424,6 +1451,11 @@ io.on("connection", (socket) => {
       return;
     }
     const texts = normalizeQuestionTexts(payloadTexts);
+    const safeActivateAt = normalizeISODate(activateAt);
+    if (activateAt && !safeActivateAt) {
+      socket.emit("action:error", "Date de programmation invalide.");
+      return;
+    }
     const missing = SUPPORTED_LANGS.find((lang) => !texts[lang]);
     if (missing) {
       socket.emit("action:error", "Chaque question doit etre renseignee en francais, anglais, espagnol et arabe.");
@@ -1431,19 +1463,28 @@ io.on("connection", (socket) => {
     }
 
     const currentStore = loadStore();
-    currentStore.questions.forEach((q) => {
-      q.active = false;
-    });
+    const now = Date.now();
+    const isFutureSchedule = safeActivateAt && new Date(safeActivateAt).getTime() > now;
+    if (!isFutureSchedule) {
+      currentStore.questions.forEach((q) => {
+        q.active = false;
+      });
+    }
     currentStore.questions.push({
       id: makeId("q"),
       text: texts[DEFAULT_LANG],
       texts,
       createdAt: new Date().toISOString(),
-      active: true,
+      activateAt: safeActivateAt || null,
+      active: !isFutureSchedule,
       answers: [],
     });
     saveStore(currentStore);
-    writeAudit("admin.question_add.success", { ip: socketIp, textFr: texts.fr });
+    writeAudit("admin.question_add.success", {
+      ip: socketIp,
+      textFr: texts.fr,
+      activateAt: safeActivateAt || "immediate",
+    });
     broadcastState(currentStore);
   });
 
@@ -1878,12 +1919,18 @@ io.on("connection", (socket) => {
 setInterval(() => {
   const store = loadStore();
   const expiredRemoved = cleanupExpiredAds(store);
+  const scheduledActivated = activateDueScheduledQuestion(store);
   const orphanRemoved = cleanupOrphanUploads(store);
-  if (expiredRemoved || orphanRemoved > 0) {
+  if (expiredRemoved || scheduledActivated || orphanRemoved > 0) {
     saveStore(store);
-    io.emit("ads:list", publicAds(store));
+    if (scheduledActivated) {
+      broadcastState(store);
+    } else {
+      io.emit("ads:list", publicAds(store));
+    }
     writeAudit("maintenance.cleanup", {
       expiredAdsRemoved: Boolean(expiredRemoved),
+      scheduledQuestionActivated: Boolean(scheduledActivated),
       orphanUploadsRemoved: orphanRemoved,
     });
   }
@@ -1928,6 +1975,10 @@ async function startServer() {
     } catch (err) {
       writeAppLog("WARN", "db.remote.init_failed_using_disk_fallback", { message: err?.message || "unknown" });
     }
+  }
+  const bootStore = loadStore();
+  if (activateDueScheduledQuestion(bootStore) || cleanupExpiredAds(bootStore)) {
+    saveStore(bootStore);
   }
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

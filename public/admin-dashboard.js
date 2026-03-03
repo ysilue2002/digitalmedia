@@ -17,6 +17,7 @@
   const questionTextEn = document.getElementById("dashboard-question-text-en");
   const questionTextEs = document.getElementById("dashboard-question-text-es");
   const questionTextAr = document.getElementById("dashboard-question-text-ar");
+  const questionActivateAt = document.getElementById("dashboard-question-activate-at");
   const adForm = document.getElementById("dashboard-ad-form");
   const adSlot = document.getElementById("dashboard-ad-slot");
   const adLabel = document.getElementById("dashboard-ad-label");
@@ -79,9 +80,15 @@
       sub.textContent = `EN: ${q?.texts?.en || "-"} | ES: ${q?.texts?.es || "-"} | AR: ${q?.texts?.ar || "-"}`;
       const meta = document.createElement("span");
       meta.className = "meta";
+      const isScheduled = !q.active && q.activateAt && new Date(q.activateAt).getTime() > Date.now();
+      const status = q.active
+        ? "ACTIVE"
+        : isScheduled
+        ? `PROGRAMMEE ${new Date(q.activateAt).toLocaleString("fr-FR")}`
+        : "ARCHIVEE";
       meta.textContent = `${new Date(q.createdAt).toLocaleString("fr-FR")} | ${q.answersCount} reponses | ${
         q.commentsCount
-      } commentaires | ${q.active ? "ACTIVE" : "ARCHIVEE"}`;
+      } commentaires | ${status}`;
       top.appendChild(strong);
       top.appendChild(sub);
       top.appendChild(meta);
@@ -415,12 +422,16 @@
           await api("/api/admin/questions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ texts }),
+            body: JSON.stringify({
+              texts,
+              activateAt: questionActivateAt?.value ? toISOFromLocalInput(questionActivateAt.value) : null,
+            }),
           });
           questionTextFr.value = "";
           questionTextEn.value = "";
           questionTextEs.value = "";
           questionTextAr.value = "";
+          if (questionActivateAt) questionActivateAt.value = "";
           await refreshAll();
         });
       }
