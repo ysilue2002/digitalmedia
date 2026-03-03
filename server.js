@@ -12,6 +12,7 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PSEUDO = (process.env.ADMIN_PSEUDO || "admin").toLowerCase();
