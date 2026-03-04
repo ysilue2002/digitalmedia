@@ -1022,6 +1022,9 @@ function activateDueScheduledQuestion(store) {
   const target = due[due.length - 1];
   (store.questions || []).forEach((q) => {
     q.active = q.id === target.id;
+    if (q.activateAt && new Date(q.activateAt).getTime() <= now) {
+      q.activateAt = null;
+    }
   });
   return true;
 }
@@ -1155,6 +1158,9 @@ app.post("/api/admin/questions", (req, res) => {
   if (!isFutureSchedule) {
     store.questions.forEach((q) => {
       q.active = false;
+      if (q.activateAt && new Date(q.activateAt).getTime() <= now) {
+        q.activateAt = null;
+      }
     });
   }
   const question = {
@@ -1185,6 +1191,9 @@ app.post("/api/admin/questions/:id/activate", (req, res) => {
   if (!target) return res.status(404).json({ error: "Question introuvable." });
   store.questions.forEach((q) => {
     q.active = q.id === safeId;
+    if (q.activateAt && new Date(q.activateAt).getTime() <= Date.now()) {
+      q.activateAt = null;
+    }
   });
   saveStore(store);
   writeAudit("admin.question_activate.success", { ip: getReqIp(req), questionId: safeId });
@@ -1469,6 +1478,9 @@ io.on("connection", (socket) => {
     if (!isFutureSchedule) {
       currentStore.questions.forEach((q) => {
         q.active = false;
+        if (q.activateAt && new Date(q.activateAt).getTime() <= now) {
+          q.activateAt = null;
+        }
       });
     }
     currentStore.questions.push({
