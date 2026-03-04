@@ -36,6 +36,7 @@ const UPLOAD_ABSOLUTE_TTL_MS = Number(process.env.UPLOAD_ABSOLUTE_TTL_MS || 90 *
 const ERROR_ALERT_THRESHOLD_PER_MIN = Number(process.env.ERROR_ALERT_THRESHOLD_PER_MIN || 20);
 const DATABASE_URL = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "";
 const USE_REMOTE_DB = Boolean(DATABASE_URL) && process.env.NODE_ENV !== "test";
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 8000);
 const typingState = new Map();
 let appErrorCounter = 0;
 const runtimeUniqueVisitors = new Set();
@@ -518,6 +519,25 @@ let dbTrafficWriteInFlight = false;
 let dbTrafficWriteQueued = false;
 let storeCache = loadStoreFromDisk();
 let trafficStats = loadTrafficStatsFromDisk();
+const responseCache = new Map();
+
+function cacheGet(key) {
+  const hit = responseCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    responseCache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function cacheSet(key, value, ttlMs = CACHE_TTL_MS) {
+  responseCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function cacheClear() {
+  responseCache.clear();
+}
 
 function loadStore() {
   return storeCache;
@@ -865,6 +885,7 @@ function getReferencedUploadSet(store) {
 function saveStore(store) {
   storeCache = parseStoreObject(store);
   saveStoreToDisk(storeCache);
+  cacheClear();
   persistStoreToDb().catch(() => {});
 }
 
@@ -1329,6 +1350,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/api/history", (_req, res) => {
+  const cached = cacheGet("history");
+  if (cached) return res.json(cached);
   const store = loadStore();
   if (cleanupExpiredAds(store)) saveStore(store);
   const history = store.questions
@@ -1342,21 +1365,31 @@ app.get("/api/history", (_req, res) => {
       active: q.active,
       answersCount: (q.answers || []).length,
     }));
+  cacheSet("history", history);
   res.json(history);
 });
 
 app.get("/api/questions/:id", (req, res) => {
+  const cacheKey = `question:${sanitizeShortText(req.params.id).slice(0, 120)}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return res.json(cached);
   const store = loadStore();
   if (cleanupExpiredAds(store)) saveStore(store);
   const question = getQuestionById(store, req.params.id);
   if (!question) return res.status(404).json({ error: "Question introuvable." });
-  return res.json(publicQuestion(question));
+  const payload = publicQuestion(question);
+  cacheSet(cacheKey, payload);
+  return res.json(payload);
 });
 
 app.get("/api/ads", (_req, res) => {
+  const cached = cacheGet("ads");
+  if (cached) return res.json(cached);
   const store = loadStore();
   if (cleanupExpiredAds(store)) saveStore(store);
-  return res.json(publicAds(store));
+  const ads = publicAds(store);
+  cacheSet("ads", ads);
+  return res.json(ads);
 });
 
 app.post("/api/admin/upload-ad-asset", uploadLimiter, (req, res, next) => {
