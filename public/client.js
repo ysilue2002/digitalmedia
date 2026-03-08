@@ -769,21 +769,25 @@
 
   async function shareQuestion(question, mode = "live") {
     if (!question?.id) return;
-    const title = textForLang(question) || t("live.currentQuestion");
-    const url =
-      mode === "history"
-        ? `${window.location.origin}/history.html#q=${encodeURIComponent(question.id)}`
-        : `${window.location.origin}/live.html`;
+    const activeQuestion = textForLang(question) || t("live.currentQuestion");
+    const url = "https://digitalmedia-s6ax.onrender.com/";
+    const text =
+      `QDAY - Question du jour\n` +
+      `"${activeQuestion}"\n` +
+      `Ton avis en 30 secondes.\n` +
+      `Pseudo + reponse + debat direct.\n` +
+      `Participe ici: ${url}\n` +
+      `#QDAY #QuestionDuJour #Debat`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: "QDAY", text: title, url });
+        await navigator.share({ title: "QDAY - Question du jour", text, url });
         return;
       } catch {}
     }
     if (navigator.clipboard?.writeText) {
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(text);
         alert(t("ui.shareSuccess"));
         return;
       } catch {}
