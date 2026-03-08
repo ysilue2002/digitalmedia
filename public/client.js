@@ -106,6 +106,9 @@
       "ui.uploadError": "Erreur upload media.",
       "ui.adminLoginDenied": "Connexion admin refusee.",
       "ui.adminPasswordRequired": "Mot de passe admin requis.",
+      "ui.shareQuestion": "Partager cette question",
+      "ui.shareSuccess": "Lien copie. Tu peux le partager.",
+      "ui.shareUnsupported": "Partage indisponible sur cet appareil.",
       "contact.label": "Contact",
       "footer.rights": "tous droits reservés à SYM_CI",
       "warn.open": "Voir les regles de communaute",
@@ -212,6 +215,9 @@
       "ui.uploadError": "Media upload error.",
       "ui.adminLoginDenied": "Admin login denied.",
       "ui.adminPasswordRequired": "Admin password required.",
+      "ui.shareQuestion": "Share this question",
+      "ui.shareSuccess": "Link copied. You can share it now.",
+      "ui.shareUnsupported": "Sharing is not available on this device.",
       "contact.label": "Contact",
       "footer.rights": "All rights reserved to SYM_CI",
       "warn.open": "View community rules",
@@ -316,6 +322,9 @@
       "ui.uploadError": "Error de carga del media.",
       "ui.adminLoginDenied": "Acceso admin rechazado.",
       "ui.adminPasswordRequired": "Contrasena admin obligatoria.",
+      "ui.shareQuestion": "Compartir esta pregunta",
+      "ui.shareSuccess": "Enlace copiado. Ya puedes compartirlo.",
+      "ui.shareUnsupported": "Compartir no esta disponible en este dispositivo.",
       "contact.label": "Contacto",
       "footer.rights": "Todos los derechos reservados a SYM_CI",
       "warn.open": "Ver reglas de la comunidad",
@@ -398,6 +407,9 @@
       "ui.uploadError": "خطأ في رفع الوسائط.",
       "ui.adminLoginDenied": "تم رفض دخول الإدارة.",
       "ui.adminPasswordRequired": "كلمة مرور الإدارة مطلوبة.",
+      "ui.shareQuestion": "مشاركة هذا السؤال",
+      "ui.shareSuccess": "تم نسخ الرابط. يمكنك مشاركته الآن.",
+      "ui.shareUnsupported": "المشاركة غير متاحة على هذا الجهاز.",
       "contact.label": "اتصال",
       "footer.rights": "جميع الحقوق محفوظة لـ SYM_CI",
       "warn.open": "عرض قواعد المجتمع",
@@ -753,6 +765,30 @@
       return texts[currentLang] || texts[DEFAULT_LANG] || node.text || "";
     }
     return node.text || "";
+  }
+
+  async function shareQuestion(question, mode = "live") {
+    if (!question?.id) return;
+    const title = textForLang(question) || t("live.currentQuestion");
+    const url =
+      mode === "history"
+        ? `${window.location.origin}/history.html#q=${encodeURIComponent(question.id)}`
+        : `${window.location.origin}/live.html`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "QDAY", text: title, url });
+        return;
+      } catch {}
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        alert(t("ui.shareSuccess"));
+        return;
+      } catch {}
+    }
+    alert(t("ui.shareUnsupported"));
   }
 
   function makeAdAssetNode(asset) {
@@ -1364,6 +1400,7 @@
 
   if (page === "/live.html") {
     const questionEl = document.getElementById("current-question");
+    const shareBtn = document.getElementById("share-current-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
     const answerText = document.getElementById("answer-text");
@@ -1509,6 +1546,7 @@
       currentLiveQuestionId = question?.id || null;
       if (!question) {
         questionEl.textContent = t("ui.noActiveQuestion");
+        if (shareBtn) shareBtn.hidden = true;
         answersList.textContent = "";
         renderTypingIndicators();
         return;
@@ -1517,6 +1555,12 @@
         visibleAnswersByQuestion.set(question.id, ANSWERS_PAGE_SIZE);
       }
       questionEl.textContent = textForLang(question);
+      if (shareBtn) {
+        shareBtn.hidden = false;
+        shareBtn.onclick = () => {
+          shareQuestion(currentQuestion, "live").catch(() => {});
+        };
+      }
       renderAnswers(question, answersList, true);
       renderTypingIndicators();
     });
@@ -1543,6 +1587,7 @@
     const historyList = document.getElementById("history-list");
     const selectedTitle = document.getElementById("selected-title");
     const selectedQuestion = document.getElementById("selected-question");
+    const shareBtn = document.getElementById("share-selected-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
     const answerText = document.getElementById("answer-text");
@@ -1595,9 +1640,15 @@
 
     socket.on("history:list", (items) => {
       historyItemsCache = Array.isArray(items) ? items : [];
+      const hashId = decodeURIComponent((window.location.hash || "").replace(/^#q=/, "").trim());
+      if (hashId && historyItemsCache.some((item) => item.id === hashId)) {
+        selectedId = hashId;
+      }
       renderHistory(items);
       if (!selectedId && items.length) {
         selectedId = items[0].id;
+        socket.emit("question:get", selectedId);
+      } else if (selectedId) {
         socket.emit("question:get", selectedId);
       }
     });
@@ -1638,8 +1689,15 @@
       if (question.id !== selectedId) return;
       selectedQuestionCache = question;
       currentHistoryQuestionId = question.id;
+      window.location.hash = `q=${encodeURIComponent(question.id)}`;
       selectedTitle.textContent = question.active ? t("ui.statusCurrent") : t("ui.statusArchived");
       selectedQuestion.textContent = textForLang(question);
+      if (shareBtn) {
+        shareBtn.hidden = false;
+        shareBtn.onclick = () => {
+          shareQuestion(selectedQuestionCache, "history").catch(() => {});
+        };
+      }
       answerForm.hidden = false;
       if (!visibleAnswersByQuestion.has(question.id)) {
         visibleAnswersByQuestion.set(question.id, ANSWERS_PAGE_SIZE);
