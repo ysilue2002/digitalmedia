@@ -20,6 +20,12 @@
       "nav.changePseudo": "Changer de pseudo",
       "nav.logout": "Deconnexion",
       "login.subtitle": "Entre juste un pseudo pour participer.",
+      "home.purposeTitle": "Le debat du jour, version vrai talk",
+      "home.purposeBody1":
+        "Chaque jour, QDAY balance une question d'actu. Tu reponds, tu commentes, tu debates cash, sans tourner autour du pot.",
+      "home.purposeBody2":
+        "Pas d'inscription longue: un pseudo et c'est parti. Espace modere, echanges plus safe, opinions assumees.",
+      "home.purposeCta": "Pose ton pseudo et entre dans le feed du debat.",
       "login.submit": "Se connecter",
       "adminLogin.subtitle": "Acces reserve a l'administration.",
       "adminLogin.password": "Mot de passe admin",
@@ -133,6 +139,12 @@
       "nav.changePseudo": "Change nickname",
       "nav.logout": "Logout",
       "login.subtitle": "Enter a nickname to join.",
+      "home.purposeTitle": "Today's hot topic, no fake talk",
+      "home.purposeBody1":
+        "Every day, QDAY drops one trending question. You answer, comment, and debate directly with zero dodging.",
+      "home.purposeBody2":
+        "No long signup flow: pick a nickname and jump in. Moderated space, safer vibes, real opinions.",
+      "home.purposeCta": "Drop your nickname and join the debate feed.",
       "login.submit": "Sign in",
       "adminLogin.subtitle": "Admin access only.",
       "adminLogin.password": "Admin password",
@@ -231,6 +243,12 @@
       "nav.changePseudo": "Cambiar alias",
       "nav.logout": "Cerrar sesion",
       "login.subtitle": "Ingresa un alias para participar.",
+      "home.purposeTitle": "El debate del dia, sin filtro",
+      "home.purposeBody1":
+        "Cada dia, QDAY lanza una pregunta en tendencia. Respondes, comentas y debates de frente, sin evasivas.",
+      "home.purposeBody2":
+        "Sin registro largo: solo un alias y entras. Espacio moderado, mas seguro y con opiniones reales.",
+      "home.purposeCta": "Pon tu alias y entra al feed del debate.",
       "login.submit": "Conectarse",
       "adminLogin.subtitle": "Acceso solo para administracion.",
       "adminLogin.password": "Contrasena admin",
@@ -330,6 +348,12 @@
       "nav.changePseudo": "تغيير الاسم",
       "nav.logout": "تسجيل الخروج",
       "login.subtitle": "أدخل اسما مستعارا للمشاركة.",
+      "home.purposeTitle": "نقاش اليوم بدون لف ولا دوران",
+      "home.purposeBody1":
+        "كل يوم، QDAY يطرح سؤالا ترند. جاوب وعلّق وناقش بشكل مباشر وبدون مراوغة.",
+      "home.purposeBody2":
+        "بدون تسجيل طويل: اسم مستعار فقط وتدخل مباشرة. مساحة خاضعة للإشراف، أكثر أمانا وآراء حقيقية.",
+      "home.purposeCta": "اكتب اسمك المستعار وادخل فورا في نقاش اليوم.",
       "login.submit": "دخول",
       "adminLogin.subtitle": "ولوج مخصص للإدارة.",
       "adminLogin.password": "كلمة مرور الإدارة",
