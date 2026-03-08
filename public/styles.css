@@ -145,6 +145,29 @@ p {
   margin-bottom: 0.35rem;
 }
 
+.home-purpose {
+  margin: 0.75rem 0 0.9rem;
+  border-color: #cde8f4;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(14, 159, 142, 0.11), rgba(14, 159, 142, 0) 45%),
+    linear-gradient(180deg, #ffffff, #f7fdff);
+}
+
+.home-purpose h2 {
+  font-size: 1.08rem;
+  margin-bottom: 0.35rem;
+}
+
+.home-purpose p {
+  margin: 0.35rem 0;
+}
+
+.purpose-cta {
+  margin-top: 0.55rem;
+  font-weight: 700;
+  color: #0b7f8f;
+}
+
 input,
 textarea,
 select,
