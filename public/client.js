@@ -109,6 +109,10 @@
       "ui.shareQuestion": "Partager cette question",
       "ui.shareSuccess": "Lien copie. Tu peux le partager.",
       "ui.shareUnsupported": "Partage indisponible sur cet appareil.",
+      "share.header": "QDAY - Question du jour",
+      "share.prompt": "Ton avis en 30 secondes.",
+      "share.flow": "Pseudo + reponse + debat direct.",
+      "share.join": "Participe ici:",
       "contact.label": "Contact",
       "footer.rights": "tous droits reservés à SYM_CI",
       "warn.open": "Voir les regles de communaute",
@@ -218,6 +222,10 @@
       "ui.shareQuestion": "Share this question",
       "ui.shareSuccess": "Link copied. You can share it now.",
       "ui.shareUnsupported": "Sharing is not available on this device.",
+      "share.header": "QDAY - Daily question",
+      "share.prompt": "Your take in 30 seconds.",
+      "share.flow": "Nickname + answer + real debate.",
+      "share.join": "Join here:",
       "contact.label": "Contact",
       "footer.rights": "All rights reserved to SYM_CI",
       "warn.open": "View community rules",
@@ -325,6 +333,10 @@
       "ui.shareQuestion": "Compartir esta pregunta",
       "ui.shareSuccess": "Enlace copiado. Ya puedes compartirlo.",
       "ui.shareUnsupported": "Compartir no esta disponible en este dispositivo.",
+      "share.header": "QDAY - Pregunta del dia",
+      "share.prompt": "Tu opinion en 30 segundos.",
+      "share.flow": "Alias + respuesta + debate directo.",
+      "share.join": "Participa aqui:",
       "contact.label": "Contacto",
       "footer.rights": "Todos los derechos reservados a SYM_CI",
       "warn.open": "Ver reglas de la comunidad",
@@ -410,6 +422,10 @@
       "ui.shareQuestion": "مشاركة هذا السؤال",
       "ui.shareSuccess": "تم نسخ الرابط. يمكنك مشاركته الآن.",
       "ui.shareUnsupported": "المشاركة غير متاحة على هذا الجهاز.",
+      "share.header": "QDAY - سؤال اليوم",
+      "share.prompt": "رأيك في 30 ثانية.",
+      "share.flow": "اسم مستعار + إجابة + نقاش مباشر.",
+      "share.join": "شارك هنا:",
       "contact.label": "اتصال",
       "footer.rights": "جميع الحقوق محفوظة لـ SYM_CI",
       "warn.open": "عرض قواعد المجتمع",
@@ -770,18 +786,18 @@
   async function shareQuestion(question, mode = "live") {
     if (!question?.id) return;
     const activeQuestion = textForLang(question) || t("live.currentQuestion");
-    const url = "https://digitalmedia-s6ax.onrender.com/";
+    const url = window.location.origin.endsWith("/") ? window.location.origin : `${window.location.origin}/`;
     const text =
-      `QDAY - Question du jour\n` +
+      `${t("share.header")}\n` +
       `"${activeQuestion}"\n` +
-      `Ton avis en 30 secondes.\n` +
-      `Pseudo + reponse + debat direct.\n` +
-      `Participe ici: ${url}\n` +
+      `${t("share.prompt")}\n` +
+      `${t("share.flow")}\n` +
+      `${t("share.join")} ${url}\n` +
       `#QDAY #QuestionDuJour #Debat`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: "QDAY - Question du jour", text, url });
+        await navigator.share({ title: t("share.header"), text, url });
         return;
       } catch {}
     }
