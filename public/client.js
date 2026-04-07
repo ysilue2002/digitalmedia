@@ -7,6 +7,9 @@
   let currentLang = localStorage.getItem("lang") || DEFAULT_LANG;
   if (isAdminPseudo) currentLang = DEFAULT_LANG;
   if (!SUPPORTED_LANGS.includes(currentLang)) currentLang = DEFAULT_LANG;
+  // PWA install + push need SW on the pages that support it; safe to attempt early.
+  // ensureServiceWorker is a function declaration (hoisted).
+  ensureServiceWorker().catch(() => {});
   const TRANSLATIONS = {
     fr: {
       "lang.label": "Langue",
@@ -117,6 +120,17 @@
       "share.join": "Participe ici:",
       "contact.label": "Contact",
       "footer.rights": "tous droits reservés à SYM_CI",
+      "notif.button": "Notifications",
+      "notif.title": "Notifications QDAY",
+      "notif.desc": "Active les alertes pour les nouvelles questions et l'activite en direct. (Langue: {lang})",
+      "notif.enable": "Activer",
+      "notif.disable": "Desactiver",
+      "notif.questions": "Nouvelles questions",
+      "notif.activity": "Reponses et commentaires",
+      "notif.statusOn": "Actif",
+      "notif.statusOff": "Inactif",
+      "notif.needInstall": "Sur iPhone/iPad: installe l'app (Partager > Sur l'ecran d'accueil) pour recevoir les notifications.",
+      "notif.permissionDenied": "Autorisation refusee. Active les notifications dans les reglages du navigateur.",
       "warn.open": "Voir les regles de communaute",
       "warn.title": "Avertissement important : regles de communaute",
       "warn.intro":
@@ -232,6 +246,17 @@
       "share.join": "Join here:",
       "contact.label": "Contact",
       "footer.rights": "All rights reserved to SYM_CI",
+      "notif.button": "Notifications",
+      "notif.title": "QDAY notifications",
+      "notif.desc": "Enable alerts for new questions and live activity. (Language: {lang})",
+      "notif.enable": "Enable",
+      "notif.disable": "Disable",
+      "notif.questions": "New questions",
+      "notif.activity": "Answers and comments",
+      "notif.statusOn": "On",
+      "notif.statusOff": "Off",
+      "notif.needInstall": "On iPhone/iPad: install the app (Share > Add to Home Screen) to receive notifications.",
+      "notif.permissionDenied": "Permission denied. Enable notifications in your browser settings.",
       "warn.open": "View community rules",
       "warn.title": "Important warning: community rules",
       "warn.intro":
@@ -345,6 +370,17 @@
       "share.join": "Participa aqui:",
       "contact.label": "Contacto",
       "footer.rights": "Todos los derechos reservados a SYM_CI",
+      "notif.button": "Notificaciones",
+      "notif.title": "Notificaciones QDAY",
+      "notif.desc": "Activa alertas para nuevas preguntas y actividad en directo. (Idioma: {lang})",
+      "notif.enable": "Activar",
+      "notif.disable": "Desactivar",
+      "notif.questions": "Nuevas preguntas",
+      "notif.activity": "Respuestas y comentarios",
+      "notif.statusOn": "Activo",
+      "notif.statusOff": "Inactivo",
+      "notif.needInstall": "En iPhone/iPad: instala la app (Compartir > Anadir a pantalla de inicio) para recibir notificaciones.",
+      "notif.permissionDenied": "Permiso denegado. Activa las notificaciones en la configuracion del navegador.",
       "warn.open": "Ver reglas de la comunidad",
       "warn.title": "Advertencia importante: reglas de la comunidad",
       "warn.intro":
@@ -436,6 +472,17 @@
       "share.join": "شارك هنا:",
       "contact.label": "اتصال",
       "footer.rights": "جميع الحقوق محفوظة لـ SYM_CI",
+      "notif.button": "الإشعارات",
+      "notif.title": "إشعارات QDAY",
+      "notif.desc": "فعّل التنبيهات للأسئلة الجديدة والنشاط المباشر. (اللغة: {lang})",
+      "notif.enable": "تفعيل",
+      "notif.disable": "إيقاف",
+      "notif.questions": "أسئلة جديدة",
+      "notif.activity": "الردود والتعليقات",
+      "notif.statusOn": "مفعّل",
+      "notif.statusOff": "متوقف",
+      "notif.needInstall": "على iPhone/iPad: ثبّت التطبيق (مشاركة > إضافة إلى الشاشة الرئيسية) لتلقي الإشعارات.",
+      "notif.permissionDenied": "تم رفض الإذن. فعّل الإشعارات من إعدادات المتصفح.",
       "warn.open": "عرض قواعد المجتمع",
       "warn.title": "تنبيه مهم: قواعد المجتمع",
       "warn.intro":
@@ -580,6 +627,24 @@
     });
   });
   applyStaticTranslations();
+
+  // Keep push preferences/lang up to date server-side when user switches language.
+  window.addEventListener("qday:lang-changed", () => {
+    (async () => {
+      try {
+        const reg = await ensureServiceWorker();
+        if (!reg) return;
+        const subscription = await reg.pushManager.getSubscription();
+        if (!subscription) return;
+        await fetch("/api/push/ping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+        });
+      } catch {}
+    })();
+    refreshNotifUi();
+  });
 
   socket.on("action:error", (message) => {
     const questionNotFound =
@@ -828,6 +893,275 @@
       video.preload = "metadata";
       container.appendChild(video);
     }
+  }
+
+  function langLabel(lang) {
+    const safe = normalizeLang(lang);
+    if (safe === "fr") return "FR";
+    if (safe === "en") return "EN";
+    if (safe === "es") return "ES";
+    if (safe === "ar") return "AR";
+    return safe.toUpperCase();
+  }
+
+  function supportsPush() {
+    return Boolean(window.PushManager && window.Notification && navigator.serviceWorker);
+  }
+
+  async function ensureServiceWorker() {
+    if (!("serviceWorker" in navigator)) return null;
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      return reg;
+    } catch {
+      return null;
+    }
+  }
+
+  function getNotifPrefs() {
+    try {
+      const raw = localStorage.getItem("qday:notif:prefs");
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        questions: Boolean(parsed?.questions ?? true),
+        activity: Boolean(parsed?.activity ?? false),
+      };
+    } catch {
+      return { questions: true, activity: false };
+    }
+  }
+
+  function setNotifPrefs(next) {
+    const safe = { questions: Boolean(next?.questions), activity: Boolean(next?.activity) };
+    localStorage.setItem("qday:notif:prefs", JSON.stringify(safe));
+    return safe;
+  }
+
+  async function getVapidPublicKey() {
+    const res = await fetch("/api/push/vapidPublicKey");
+    if (!res.ok) throw new Error("push.key");
+    const json = await res.json();
+    return String(json.publicKey || "");
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function subscribeToPush() {
+    const reg = await ensureServiceWorker();
+    if (!reg) throw new Error("push.sw");
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") throw new Error("push.denied");
+
+    const publicKey = await getVapidPublicKey();
+    if (!publicKey) throw new Error("push.key");
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    const prefs = getNotifPrefs();
+    const payload = {
+      subscription,
+      lang: currentLang,
+      prefs,
+      pseudo,
+    };
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Erreur push" }));
+      throw new Error(err.error || "Erreur push");
+    }
+    return true;
+  }
+
+  async function unsubscribeFromPush() {
+    const reg = await ensureServiceWorker();
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return true;
+    await fetch("/api/push/unsubscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub }),
+    }).catch(() => {});
+    try {
+      await sub.unsubscribe();
+    } catch {}
+    return true;
+  }
+
+  function ensureNotifModal() {
+    if (document.getElementById("notif-backdrop")) return;
+    const backdrop = document.createElement("div");
+    backdrop.id = "notif-backdrop";
+    backdrop.className = "notif-modal-backdrop";
+    backdrop.hidden = true;
+
+    const modal = document.createElement("div");
+    modal.className = "notif-modal";
+
+    const h = document.createElement("h3");
+    h.setAttribute("data-i18n", "notif.title");
+    h.textContent = "Notifications QDAY";
+
+    const desc = document.createElement("p");
+    desc.className = "meta";
+    desc.id = "notif-desc";
+
+    const rowQ = document.createElement("div");
+    rowQ.className = "notif-row";
+    const rowQLeft = document.createElement("div");
+    const rowQTitle = document.createElement("strong");
+    rowQTitle.setAttribute("data-i18n", "notif.questions");
+    rowQTitle.textContent = "Nouvelles questions";
+    const rowQMeta = document.createElement("span");
+    rowQMeta.className = "meta";
+    rowQMeta.id = "notif-q-status";
+    rowQLeft.appendChild(rowQTitle);
+    rowQLeft.appendChild(rowQMeta);
+    const toggleQ = document.createElement("div");
+    toggleQ.className = "toggle";
+    toggleQ.id = "toggle-questions";
+    toggleQ.setAttribute("role", "switch");
+    toggleQ.setAttribute("tabindex", "0");
+    rowQ.appendChild(rowQLeft);
+    rowQ.appendChild(toggleQ);
+
+    const rowA = document.createElement("div");
+    rowA.className = "notif-row";
+    const rowALeft = document.createElement("div");
+    const rowATitle = document.createElement("strong");
+    rowATitle.setAttribute("data-i18n", "notif.activity");
+    rowATitle.textContent = "Reponses et commentaires";
+    const rowAMeta = document.createElement("span");
+    rowAMeta.className = "meta";
+    rowAMeta.id = "notif-a-status";
+    rowALeft.appendChild(rowATitle);
+    rowALeft.appendChild(rowAMeta);
+    const toggleA = document.createElement("div");
+    toggleA.className = "toggle";
+    toggleA.id = "toggle-activity";
+    toggleA.setAttribute("role", "switch");
+    toggleA.setAttribute("tabindex", "0");
+    rowA.appendChild(rowALeft);
+    rowA.appendChild(toggleA);
+
+    const note = document.createElement("p");
+    note.className = "meta";
+    note.id = "notif-note";
+
+    const actions = document.createElement("div");
+    actions.className = "notif-actions";
+    const btnEnable = document.createElement("button");
+    btnEnable.id = "notif-enable";
+    btnEnable.setAttribute("data-i18n", "notif.enable");
+    btnEnable.textContent = "Activer";
+    const btnDisable = document.createElement("button");
+    btnDisable.id = "notif-disable";
+    btnDisable.className = "danger-btn";
+    btnDisable.setAttribute("data-i18n", "notif.disable");
+    btnDisable.textContent = "Desactiver";
+    const btnClose = document.createElement("button");
+    btnClose.type = "button";
+    btnClose.className = "ghost-btn";
+    btnClose.setAttribute("data-i18n", "warn.close");
+    btnClose.textContent = "Fermer";
+    actions.appendChild(btnClose);
+    actions.appendChild(btnDisable);
+    actions.appendChild(btnEnable);
+
+    modal.appendChild(h);
+    modal.appendChild(desc);
+    modal.appendChild(rowQ);
+    modal.appendChild(rowA);
+    modal.appendChild(note);
+    modal.appendChild(actions);
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) backdrop.hidden = true;
+    });
+    btnClose.addEventListener("click", () => {
+      backdrop.hidden = true;
+    });
+  }
+
+  async function refreshNotifUi() {
+    const desc = document.getElementById("notif-desc");
+    const note = document.getElementById("notif-note");
+    const tQ = document.getElementById("toggle-questions");
+    const tA = document.getElementById("toggle-activity");
+    const sQ = document.getElementById("notif-q-status");
+    const sA = document.getElementById("notif-a-status");
+    const prefs = getNotifPrefs();
+
+    if (desc) desc.textContent = t("notif.desc", { lang: langLabel(currentLang) });
+    if (tQ) tQ.dataset.on = prefs.questions ? "true" : "false";
+    if (tA) tA.dataset.on = prefs.activity ? "true" : "false";
+    if (sQ) sQ.textContent = prefs.questions ? t("notif.statusOn") : t("notif.statusOff");
+    if (sA) sA.textContent = prefs.activity ? t("notif.statusOn") : t("notif.statusOff");
+
+    if (note) {
+      const perm = window.Notification ? Notification.permission : "default";
+      note.textContent = perm === "denied" ? t("notif.permissionDenied") : t("notif.needInstall");
+      if (!supportsPush()) note.textContent = t("ui.shareUnsupported");
+    }
+  }
+
+  function bindNotifModalInteractions() {
+    const tQ = document.getElementById("toggle-questions");
+    const tA = document.getElementById("toggle-activity");
+    const btnEnable = document.getElementById("notif-enable");
+    const btnDisable = document.getElementById("notif-disable");
+    const backdrop = document.getElementById("notif-backdrop");
+    if (!backdrop || !tQ || !tA || !btnEnable || !btnDisable) return;
+
+    const toggle = (key) => {
+      const prefs = getNotifPrefs();
+      prefs[key] = !prefs[key];
+      setNotifPrefs(prefs);
+      refreshNotifUi();
+    };
+    const keyToggleHandler = (key) => (e) => {
+      if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      toggle(key);
+    };
+
+    tQ.addEventListener("click", () => toggle("questions"));
+    tQ.addEventListener("keydown", keyToggleHandler("questions"));
+    tA.addEventListener("click", () => toggle("activity"));
+    tA.addEventListener("keydown", keyToggleHandler("activity"));
+
+    btnEnable.addEventListener("click", async () => {
+      try {
+        await subscribeToPush();
+        backdrop.hidden = true;
+        alert(t("notif.statusOn"));
+      } catch (e) {
+        alert(String(e?.message || "Erreur"));
+      }
+    });
+
+    btnDisable.addEventListener("click", async () => {
+      await unsubscribeFromPush().catch(() => {});
+      backdrop.hidden = true;
+      alert(t("notif.statusOff"));
+    });
   }
 
   async function shareQuestion(question, mode = "live") {
@@ -1475,6 +1809,21 @@
     bindCommunityWarning(answerForm);
     let currentQuestion = null;
 
+    // PWA + Push notifications
+    ensureServiceWorker().catch(() => {});
+    ensureNotifModal();
+    bindNotifModalInteractions();
+    refreshNotifUi();
+    const notifBtn = document.getElementById("notif-btn");
+    if (notifBtn) {
+      notifBtn.addEventListener("click", () => {
+        const backdrop = document.getElementById("notif-backdrop");
+        if (!backdrop) return;
+        backdrop.hidden = false;
+        refreshNotifUi();
+      });
+    }
+
     const adminPanel = document.getElementById("admin-panel");
     if (isAdminPseudo && adminPanel) {
       fetch("/api/admin/status")
@@ -1668,6 +2017,21 @@
     let selectedId = null;
     let historyItemsCache = [];
     let selectedQuestionCache = null;
+
+    // PWA + Push notifications
+    ensureServiceWorker().catch(() => {});
+    ensureNotifModal();
+    bindNotifModalInteractions();
+    refreshNotifUi();
+    const notifBtn = document.getElementById("notif-btn");
+    if (notifBtn) {
+      notifBtn.addEventListener("click", () => {
+        const backdrop = document.getElementById("notif-backdrop");
+        if (!backdrop) return;
+        backdrop.hidden = false;
+        refreshNotifUi();
+      });
+    }
 
     if (isAdminPseudo) {
       fetch("/api/admin/status")

@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const multer = require("multer");
 const { Pool } = require("pg");
 const { Server } = require("socket.io");
+const webpush = require("web-push");
 
 const app = express();
 const server = http.createServer(app);
@@ -54,6 +55,12 @@ const DEFAULT_LANG = "fr";
 const SUPPORTED_LANGS = ["fr", "en", "es", "ar"];
 const QUESTION_MEDIA_ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"]);
 const QUESTION_MEDIA_ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"]);
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:digitalmediaci@proton.me";
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
+let vapidPublicKeyRuntime = VAPID_PUBLIC_KEY;
+let vapidPrivateKeyRuntime = VAPID_PRIVATE_KEY;
+let pushEnabled = false;
 const AD_SLOTS = new Set([
   "login-main",
   "live-top",
@@ -104,6 +111,32 @@ if (!fs.existsSync(DATA_DIR)) {
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+if (!vapidPublicKeyRuntime || !vapidPrivateKeyRuntime) {
+  // For local/dev, generate ephemeral keys (subscriptions will break after restart).
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const keys = webpush.generateVAPIDKeys();
+      vapidPublicKeyRuntime = keys.publicKey;
+      vapidPrivateKeyRuntime = keys.privateKey;
+      pushEnabled = true;
+      // eslint-disable-next-line no-console
+      console.warn("[WARN] push.vapid.generated_ephemeral_keys_for_dev");
+    } catch {
+      pushEnabled = false;
+    }
+  }
+} else {
+  pushEnabled = true;
+}
+
+if (pushEnabled) {
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, vapidPublicKeyRuntime, vapidPrivateKeyRuntime);
+  } catch {
+    pushEnabled = false;
+  }
 }
 
 app.use(
@@ -479,16 +512,17 @@ function parseStoreObject(parsed) {
     questions: Array.isArray(parsed?.questions) ? parsed.questions : [],
     ads: Array.isArray(parsed?.ads) ? parsed.ads : [],
     reports: Array.isArray(parsed?.reports) ? parsed.reports : [],
+    pushSubs: Array.isArray(parsed?.pushSubs) ? parsed.pushSubs : [],
   };
 }
 
 function loadStoreFromDisk() {
-  if (!fs.existsSync(STORE_PATH)) return { questions: [], ads: [], reports: [] };
+  if (!fs.existsSync(STORE_PATH)) return { questions: [], ads: [], reports: [], pushSubs: [] };
   try {
     const parsed = JSON.parse(fs.readFileSync(STORE_PATH, "utf8"));
     return parseStoreObject(parsed);
   } catch {
-    return { questions: [], ads: [], reports: [] };
+    return { questions: [], ads: [], reports: [], pushSubs: [] };
   }
 }
 
@@ -955,6 +989,71 @@ function getReferencedUploadSet(store) {
   return refs;
 }
 
+function pushSubIdFromEndpoint(endpoint) {
+  if (typeof endpoint !== "string" || !endpoint.trim()) return null;
+  // Stable id without storing raw endpoint as key.
+  return crypto.createHash("sha256").update(endpoint).digest("hex").slice(0, 40);
+}
+
+function normalizePushPrefs(input) {
+  const obj = input && typeof input === "object" ? input : {};
+  return {
+    questions: Boolean(obj.questions ?? true),
+    activity: Boolean(obj.activity ?? false),
+  };
+}
+
+function normalizePushSubscription(input) {
+  const sub = input && typeof input === "object" ? input : null;
+  const endpoint = sanitizeText(sub?.endpoint).slice(0, 500);
+  if (!endpoint) return null;
+  const keys = sub?.keys && typeof sub.keys === "object" ? sub.keys : {};
+  const p256dh = sanitizeText(keys?.p256dh).slice(0, 300);
+  const auth = sanitizeText(keys?.auth).slice(0, 200);
+  if (!p256dh || !auth) return null;
+  return {
+    endpoint,
+    keys: { p256dh, auth },
+  };
+}
+
+async function pushSendToSubs(store, filterFn, payload) {
+  if (!pushEnabled) return { ok: false, sent: 0 };
+  const subs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  let sent = 0;
+  const toRemove = new Set();
+
+  for (const row of subs) {
+    try {
+      if (!filterFn(row)) continue;
+      const subscription = row?.subscription;
+      if (!subscription?.endpoint) continue;
+      await webpush.sendNotification(subscription, JSON.stringify(payload), {
+        TTL: 60,
+      });
+      sent += 1;
+    } catch (err) {
+      const code = err?.statusCode || err?.status || null;
+      if (code === 404 || code === 410) {
+        if (row?.id) toRemove.add(row.id);
+      }
+    }
+  }
+
+  if (toRemove.size) {
+    store.pushSubs = subs.filter((s) => !toRemove.has(s.id));
+  }
+  return { ok: true, sent };
+}
+
+function pushTitleForLang(lang) {
+  const safe = sanitizeLang(lang);
+  if (safe === "en") return "QDAY - Daily question";
+  if (safe === "es") return "QDAY - Pregunta del dia";
+  if (safe === "ar") return "QDAY - سؤال اليوم";
+  return "QDAY - Question du jour";
+}
+
 function saveStore(store) {
   storeCache = parseStoreObject(store);
   saveStoreToDisk(storeCache);
@@ -1282,6 +1381,20 @@ app.post("/api/admin/questions", (req, res) => {
     textFr: texts.fr,
     activateAt: safeActivateAt || "immediate",
   });
+  if (!safeActivateAt) {
+    // Notify users (per language) only for immediate activation.
+    const notifyStore = loadStore();
+    SUPPORTED_LANGS.forEach((lang) => {
+      const qText = questionTextForLang(question, lang);
+      const asset = questionMediaForLang(question, lang);
+      const body = (qText || "").slice(0, 180) || (asset?.kind === "video" ? "Nouvelle video" : "Nouvelle image");
+      pushSendToSubs(
+        notifyStore,
+        (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.questions),
+        { title: pushTitleForLang(lang), body, url: "/live.html" }
+      ).catch(() => {});
+    });
+  }
   broadcastState(store);
   return res.json({ ok: true, question: publicQuestion(question) });
 });
@@ -1300,6 +1413,20 @@ app.post("/api/admin/questions/:id/activate", (req, res) => {
   });
   saveStore(store);
   writeAudit("admin.question_activate.success", { ip: getReqIp(req), questionId: safeId });
+  const activeQ = getCurrentQuestion(store);
+  if (activeQ) {
+    const notifyStore = loadStore();
+    SUPPORTED_LANGS.forEach((lang) => {
+      const qText = questionTextForLang(activeQ, lang);
+      const asset = questionMediaForLang(activeQ, lang);
+      const body = (qText || "").slice(0, 180) || (asset?.kind === "video" ? "Nouvelle video" : "Nouvelle image");
+      pushSendToSubs(
+        notifyStore,
+        (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.questions),
+        { title: pushTitleForLang(lang), body, url: "/live.html" }
+      ).catch(() => {});
+    });
+  }
   broadcastState(store);
   return res.json({ ok: true });
 });
@@ -1480,6 +1607,79 @@ app.get("/api/ads", (_req, res) => {
   const ads = publicAds(store);
   cacheSet("ads", ads);
   return res.json(ads);
+});
+
+app.get("/api/push/vapidPublicKey", (_req, res) => {
+  if (!pushEnabled) return res.status(503).json({ error: "Push desactive." });
+  return res.json({ publicKey: vapidPublicKeyRuntime });
+});
+
+app.post("/api/push/subscribe", apiLimiter, (req, res) => {
+  if (!pushEnabled) return res.status(503).json({ error: "Push desactive." });
+  const subscription = normalizePushSubscription(req.body?.subscription);
+  if (!subscription) return res.status(400).json({ error: "Subscription invalide." });
+  const lang = sanitizeLang(req.body?.lang);
+  const prefs = normalizePushPrefs(req.body?.prefs);
+  const safePseudo = sanitizeShortText(req.body?.pseudo).slice(0, 40);
+  const id = pushSubIdFromEndpoint(subscription.endpoint);
+  if (!id) return res.status(400).json({ error: "Subscription invalide." });
+
+  const store = loadStore();
+  store.pushSubs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  const existing = store.pushSubs.find((s) => s.id === id);
+  const row = {
+    id,
+    subscription,
+    lang,
+    prefs,
+    pseudo: safePseudo || null,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    lastIp: getReqIp(req),
+  };
+  if (existing) {
+    Object.assign(existing, row);
+  } else {
+    // Cap to keep store reasonable.
+    if (store.pushSubs.length >= 5000) store.pushSubs.shift();
+    store.pushSubs.push(row);
+  }
+  saveStore(store);
+  writeAudit("push.subscribe", { ip: getReqIp(req), lang, prefs });
+  return res.json({ ok: true });
+});
+
+app.post("/api/push/ping", apiLimiter, (req, res) => {
+  if (!pushEnabled) return res.json({ ok: true, enabled: false });
+  const subscription = normalizePushSubscription(req.body?.subscription);
+  if (!subscription) return res.json({ ok: true, enabled: true });
+  const id = pushSubIdFromEndpoint(subscription.endpoint);
+  if (!id) return res.json({ ok: true, enabled: true });
+  const store = loadStore();
+  store.pushSubs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  const existing = store.pushSubs.find((s) => s.id === id);
+  if (existing) {
+    existing.lang = sanitizeLang(req.body?.lang);
+    existing.prefs = normalizePushPrefs(req.body?.prefs);
+    existing.updatedAt = new Date().toISOString();
+    existing.lastIp = getReqIp(req);
+    saveStore(store);
+  }
+  return res.json({ ok: true, enabled: true });
+});
+
+app.post("/api/push/unsubscribe", apiLimiter, (req, res) => {
+  const subscription = normalizePushSubscription(req.body?.subscription);
+  if (!subscription) return res.json({ ok: true });
+  const id = pushSubIdFromEndpoint(subscription.endpoint);
+  if (!id) return res.json({ ok: true });
+  const store = loadStore();
+  store.pushSubs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  const before = store.pushSubs.length;
+  store.pushSubs = store.pushSubs.filter((s) => s.id !== id);
+  if (store.pushSubs.length !== before) saveStore(store);
+  writeAudit("push.unsubscribe", { ip: getReqIp(req) });
+  return res.json({ ok: true });
 });
 
 app.post("/api/admin/upload-ad-asset", uploadLimiter, (req, res, next) => {
@@ -1698,6 +1898,24 @@ io.on("connection", (socket) => {
     saveStore(currentStore);
     io.emit("question:updated", publicQuestion(question));
     broadcastState(currentStore);
+
+    // Push: new answer (per language).
+    const payload = {
+      title: pushTitleForLang(safeLang),
+      body:
+        safeLang === "en"
+          ? `New answer: ${safeText.slice(0, 140)}`
+          : safeLang === "es"
+          ? `Nueva respuesta: ${safeText.slice(0, 140)}`
+          : safeLang === "ar"
+          ? `رد جديد: ${safeText.slice(0, 140)}`
+          : `Nouvelle reponse: ${safeText.slice(0, 140)}`,
+      url: "/live.html",
+    };
+    const notifyStore = loadStore();
+    pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
+      () => {}
+    );
   });
 
   socket.on("comment:add", ({ questionId, answerId, text, author, lang }) => {
@@ -1729,6 +1947,24 @@ io.on("connection", (socket) => {
     saveStore(currentStore);
     io.emit("question:updated", publicQuestion(question));
     broadcastState(currentStore);
+
+    // Push: new comment (per language).
+    const payload = {
+      title: pushTitleForLang(safeLang),
+      body:
+        safeLang === "en"
+          ? `New comment: ${safeText.slice(0, 140)}`
+          : safeLang === "es"
+          ? `Nuevo comentario: ${safeText.slice(0, 140)}`
+          : safeLang === "ar"
+          ? `تعليق جديد: ${safeText.slice(0, 140)}`
+          : `Nouveau commentaire: ${safeText.slice(0, 140)}`,
+      url: "/live.html",
+    };
+    const notifyStore = loadStore();
+    pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
+      () => {}
+    );
   });
 
   socket.on("report:add", ({ questionId, answerId, commentId, reason, details, author }) => {

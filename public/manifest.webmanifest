@@ -1,0 +1,25 @@
+{
+  "name": "QDAY",
+  "short_name": "QDAY",
+  "description": "Question du jour, reponses et debat en direct.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4fbff",
+  "theme_color": "#0e9f8e",
+  "icons": [
+    {
+      "src": "/logo-qday.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-qday.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
+

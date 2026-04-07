@@ -143,6 +143,105 @@ p {
   transform: translateY(-1px);
 }
 
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(16, 42, 67, 0.16);
+  color: rgba(9, 42, 66, 0.92);
+  box-shadow: none;
+  font-weight: 800;
+}
+
+.ghost-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(10, 30, 60, 0.12);
+  filter: none;
+}
+
+.notif-modal-backdrop[hidden] {
+  display: none;
+}
+
+.notif-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 14, 20, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.notif-modal {
+  width: min(560px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 252, 255, 0.92));
+  box-shadow: 0 28px 70px rgba(7, 18, 32, 0.42);
+  padding: 1rem 1rem 0.9rem;
+}
+
+.notif-modal h3 {
+  margin: 0 0 0.35rem;
+}
+
+.notif-modal .meta {
+  margin: 0.2rem 0 0.7rem;
+}
+
+.notif-row {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(16, 42, 67, 0.12);
+  border-radius: 14px;
+  padding: 0.7rem 0.75rem;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.notif-row strong {
+  display: block;
+}
+
+.notif-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  justify-content: flex-end;
+}
+
+.toggle {
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 42, 67, 0.16);
+  background: rgba(11, 127, 143, 0.12);
+  position: relative;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.toggle[data-on="true"] {
+  background: rgba(14, 159, 142, 0.22);
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(10, 30, 60, 0.22);
+  transition: transform 0.18s ease;
+}
+
+.toggle[data-on="true"]::after {
+  transform: translateX(22px);
+}
+
 .brand-link {
   display: inline-flex;
 }
