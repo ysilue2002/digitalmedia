@@ -27,14 +27,74 @@
     <section class="card" id="questions">
       <h2>Gestion des questions</h2>
       <form id="dashboard-question-form" class="stack">
-        <label for="dashboard-question-text-fr">Question du jour (Francais)</label>
-        <textarea id="dashboard-question-text-fr" rows="3" maxlength="500" required></textarea>
-        <label for="dashboard-question-text-en">Question du jour (Anglais)</label>
-        <textarea id="dashboard-question-text-en" rows="3" maxlength="500" required></textarea>
-        <label for="dashboard-question-text-es">Question du jour (Espagnol)</label>
-        <textarea id="dashboard-question-text-es" rows="3" maxlength="500" required></textarea>
-        <label for="dashboard-question-text-ar">Question du jour (Arabe)</label>
-        <textarea id="dashboard-question-text-ar" rows="3" maxlength="500" required dir="rtl"></textarea>
+        <fieldset class="lang-fieldset">
+          <legend>Francais</legend>
+          <label for="dashboard-question-kind-fr">Contenu</label>
+          <select id="dashboard-question-kind-fr">
+            <option value="text">Question texte</option>
+            <option value="image">Image + (question optionnelle)</option>
+            <option value="video">Video + (question optionnelle)</option>
+          </select>
+          <label for="dashboard-question-text-fr">Question (si tu choisis \"Question texte\", c'est obligatoire)</label>
+          <textarea id="dashboard-question-text-fr" rows="3" maxlength="500" placeholder="Ecris la question en francais..."></textarea>
+          <div id="dashboard-question-media-row-fr" class="stack" hidden>
+            <label for="dashboard-question-media-fr">Media (image/video)</label>
+            <input id="dashboard-question-media-fr" type="file" accept="image/*,video/*" />
+            <div id="dashboard-question-media-meta-fr" class="meta">Aucun media selectionne.</div>
+          </div>
+        </fieldset>
+
+        <fieldset class="lang-fieldset">
+          <legend>Anglais</legend>
+          <label for="dashboard-question-kind-en">Contenu</label>
+          <select id="dashboard-question-kind-en">
+            <option value="text">Question texte</option>
+            <option value="image">Image + (question optionnelle)</option>
+            <option value="video">Video + (question optionnelle)</option>
+          </select>
+          <label for="dashboard-question-text-en">Question (si tu choisis \"Question texte\", c'est obligatoire)</label>
+          <textarea id="dashboard-question-text-en" rows="3" maxlength="500" placeholder="Write the question in English..."></textarea>
+          <div id="dashboard-question-media-row-en" class="stack" hidden>
+            <label for="dashboard-question-media-en">Media (image/video)</label>
+            <input id="dashboard-question-media-en" type="file" accept="image/*,video/*" />
+            <div id="dashboard-question-media-meta-en" class="meta">Aucun media selectionne.</div>
+          </div>
+        </fieldset>
+
+        <fieldset class="lang-fieldset">
+          <legend>Espagnol</legend>
+          <label for="dashboard-question-kind-es">Contenu</label>
+          <select id="dashboard-question-kind-es">
+            <option value="text">Question texte</option>
+            <option value="image">Image + (question optionnelle)</option>
+            <option value="video">Video + (question optionnelle)</option>
+          </select>
+          <label for="dashboard-question-text-es">Question (si tu choisis \"Question texte\", c'est obligatoire)</label>
+          <textarea id="dashboard-question-text-es" rows="3" maxlength="500" placeholder="Escribe la pregunta en espanol..."></textarea>
+          <div id="dashboard-question-media-row-es" class="stack" hidden>
+            <label for="dashboard-question-media-es">Media (image/video)</label>
+            <input id="dashboard-question-media-es" type="file" accept="image/*,video/*" />
+            <div id="dashboard-question-media-meta-es" class="meta">Aucun media selectionne.</div>
+          </div>
+        </fieldset>
+
+        <fieldset class="lang-fieldset">
+          <legend>Arabe</legend>
+          <label for="dashboard-question-kind-ar">Contenu</label>
+          <select id="dashboard-question-kind-ar">
+            <option value="text">Question texte</option>
+            <option value="image">Image + (question optionnelle)</option>
+            <option value="video">Video + (question optionnelle)</option>
+          </select>
+          <label for="dashboard-question-text-ar">Question (si tu choisis \"Question texte\", c'est obligatoire)</label>
+          <textarea id="dashboard-question-text-ar" rows="3" maxlength="500" placeholder="اكتب السؤال بالعربية..." dir="rtl"></textarea>
+          <div id="dashboard-question-media-row-ar" class="stack" hidden>
+            <label for="dashboard-question-media-ar">Media (image/video)</label>
+            <input id="dashboard-question-media-ar" type="file" accept="image/*,video/*" />
+            <div id="dashboard-question-media-meta-ar" class="meta">Aucun media selectionne.</div>
+          </div>
+        </fieldset>
+
         <label for="dashboard-question-activate-at">Programmer la publication (optionnel)</label>
         <input id="dashboard-question-activate-at" type="datetime-local" />
         <button type="submit">Publier et activer</button>

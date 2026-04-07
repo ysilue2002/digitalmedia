@@ -52,6 +52,8 @@ const MAX_TEXT = 500;
 const MAX_SHORT_TEXT = 80;
 const DEFAULT_LANG = "fr";
 const SUPPORTED_LANGS = ["fr", "en", "es", "ar"];
+const QUESTION_MEDIA_ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"]);
+const QUESTION_MEDIA_ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"]);
 const AD_SLOTS = new Set([
   "login-main",
   "live-top",
@@ -390,11 +392,75 @@ function normalizeQuestionTexts(input, legacyText = "") {
   return out;
 }
 
+function normalizeQuestionMedia(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const out = {};
+  SUPPORTED_LANGS.forEach((lang) => {
+    const row = source[lang];
+    if (!row || typeof row !== "object") {
+      out[lang] = null;
+      return;
+    }
+    const asset = row.asset && typeof row.asset === "object" ? row.asset : row;
+    const url = sanitizeText(asset.url).slice(0, 300);
+    const name = sanitizeShortText(asset.name);
+    const mime = sanitizeShortText(asset.mime).slice(0, 100);
+    const kind = sanitizeShortText(asset.kind);
+    const size = Number.isFinite(Number(asset.size)) ? Number(asset.size) : 0;
+    if (!url.startsWith("/uploads/")) {
+      out[lang] = null;
+      return;
+    }
+    if (!["image", "video"].includes(kind)) {
+      out[lang] = null;
+      return;
+    }
+    if (mime && !QUESTION_MEDIA_ALLOWED_MIME.has(mime)) {
+      out[lang] = null;
+      return;
+    }
+    out[lang] = {
+      asset: {
+        url,
+        name: name || "media",
+        mime: mime || "application/octet-stream",
+        kind,
+        size: size > 0 ? size : 0,
+      },
+    };
+  });
+  return out;
+}
+
 function questionTextForLang(question, lang = DEFAULT_LANG) {
   if (!question) return "";
   const texts = normalizeQuestionTexts(question.texts, question.text || "");
   const safeLang = sanitizeLang(lang);
   return texts[safeLang] || texts[DEFAULT_LANG] || "";
+}
+
+function questionMediaForLang(question, lang = DEFAULT_LANG) {
+  if (!question) return null;
+  const media = normalizeQuestionMedia(question.media);
+  const safeLang = sanitizeLang(lang);
+  return media?.[safeLang]?.asset || media?.[DEFAULT_LANG]?.asset || null;
+}
+
+function questionPreviewForLang(question, lang = DEFAULT_LANG) {
+  const txt = questionTextForLang(question, lang);
+  if (txt) return txt;
+  const asset = questionMediaForLang(question, lang);
+  if (!asset) return "";
+  if (asset.kind === "video") return "[Video]";
+  if (asset.kind === "image") return "[Image]";
+  return "[Media]";
+}
+
+function questionHasContentForLang(texts, media, lang) {
+  const safeLang = sanitizeLang(lang);
+  const hasText = Boolean(texts?.[safeLang]);
+  const hasAsset = Boolean(media?.[safeLang]?.asset?.url);
+  return hasText || hasAsset;
 }
 
 function normalizeISODate(value) {
@@ -879,6 +945,13 @@ function getReferencedUploadSet(store) {
     const filename = extractUploadFilenameFromUrl(ad?.asset?.url);
     if (filename) refs.add(filename);
   });
+  (store.questions || []).forEach((q) => {
+    const media = normalizeQuestionMedia(q?.media);
+    SUPPORTED_LANGS.forEach((lang) => {
+      const filename = extractUploadFilenameFromUrl(media?.[lang]?.asset?.url);
+      if (filename) refs.add(filename);
+    });
+  });
   return refs;
 }
 
@@ -907,10 +980,12 @@ function getCommentById(answer, commentId) {
 
 function publicQuestion(question) {
   const texts = normalizeQuestionTexts(question.texts, question.text || "");
+  const media = normalizeQuestionMedia(question.media);
   return {
     id: question.id,
     text: texts[DEFAULT_LANG],
     texts,
+    media,
     createdAt: question.createdAt,
     active: question.active,
     answers: (question.answers || []).map((a) => ({
@@ -1058,8 +1133,9 @@ function broadcastState(store) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map((q) => ({
       id: q.id,
-      text: questionTextForLang(q, DEFAULT_LANG),
+      text: questionPreviewForLang(q, DEFAULT_LANG),
       texts: normalizeQuestionTexts(q.texts, q.text || ""),
+      media: normalizeQuestionMedia(q.media),
       createdAt: q.createdAt,
       active: q.active,
       answersCount: (q.answers || []).length,
@@ -1150,8 +1226,9 @@ app.get("/api/admin/questions", (req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map((q) => ({
       id: q.id,
-      text: questionTextForLang(q, DEFAULT_LANG),
+      text: questionPreviewForLang(q, DEFAULT_LANG),
       texts: normalizeQuestionTexts(q.texts, q.text || ""),
+      media: normalizeQuestionMedia(q.media),
       createdAt: q.createdAt,
       activateAt: q.activateAt || null,
       active: Boolean(q.active),
@@ -1165,13 +1242,17 @@ app.post("/api/admin/questions", (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
   const rawTexts = req.body?.texts && typeof req.body.texts === "object" ? req.body.texts : null;
   const texts = normalizeQuestionTexts(rawTexts);
+  const rawMedia = req.body?.media && typeof req.body.media === "object" ? req.body.media : null;
+  const media = normalizeQuestionMedia(rawMedia);
   const safeActivateAt = normalizeISODate(req.body?.activateAt);
   if (req.body?.activateAt && !safeActivateAt) {
     return res.status(400).json({ error: "Date de programmation invalide." });
   }
-  const missing = SUPPORTED_LANGS.find((lang) => !texts[lang]);
+  const missing = SUPPORTED_LANGS.find((lang) => !questionHasContentForLang(texts, media, lang));
   if (missing) {
-    return res.status(400).json({ error: "Chaque question doit etre renseignee en francais, anglais, espagnol et arabe." });
+    return res.status(400).json({
+      error: "Chaque langue doit contenir soit un texte soit un media (image ou video).",
+    });
   }
   const store = loadStore();
   const now = Date.now();
@@ -1188,6 +1269,7 @@ app.post("/api/admin/questions", (req, res) => {
     id: makeId("q"),
     text: texts[DEFAULT_LANG],
     texts,
+    media,
     createdAt: new Date().toISOString(),
     activateAt: safeActivateAt || null,
     active: !isFutureSchedule,
@@ -1226,9 +1308,16 @@ app.delete("/api/admin/questions/:id", (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
   const safeId = sanitizeShortText(req.params.id).slice(0, 120);
   const store = loadStore();
+  const victim = getQuestionById(store, safeId);
   const before = store.questions.length;
   store.questions = store.questions.filter((q) => q.id !== safeId);
   if (store.questions.length === before) return res.status(404).json({ error: "Question introuvable." });
+  // Best-effort cleanup of media assets linked to this question.
+  const victimMedia = normalizeQuestionMedia(victim?.media);
+  SUPPORTED_LANGS.forEach((lang) => {
+    const asset = victimMedia?.[lang]?.asset;
+    if (asset) deleteAssetFile(asset);
+  });
   if (!store.questions.some((q) => q.active) && store.questions.length > 0) {
     store.questions[0].active = true;
   }
@@ -1359,8 +1448,9 @@ app.get("/api/history", (_req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map((q) => ({
       id: q.id,
-      text: questionTextForLang(q, DEFAULT_LANG),
+      text: questionPreviewForLang(q, DEFAULT_LANG),
       texts: normalizeQuestionTexts(q.texts, q.text || ""),
+      media: normalizeQuestionMedia(q.media),
       createdAt: q.createdAt,
       active: q.active,
       answersCount: (q.answers || []).length,
@@ -1425,6 +1515,45 @@ app.post("/api/admin/upload-ad-asset", (req, res) => {
   return res.json(asset);
 });
 
+const uploadQuestionMedia = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const ok = QUESTION_MEDIA_ALLOWED_MIME.has(file.mimetype || "") && QUESTION_MEDIA_ALLOWED_EXT.has(ext);
+    if (!ok) return cb(new Error("Type de fichier non autorise (image ou video uniquement)."));
+    cb(null, true);
+  },
+});
+
+app.post("/api/admin/upload-question-media", uploadLimiter, (req, res, next) => {
+  if (!isAdminRequest(req)) {
+    writeAudit("admin.upload.denied", { ip: getReqIp(req) });
+    return res.status(403).json({ error: "Acces admin requis." });
+  }
+  uploadQuestionMedia.single("asset")(req, res, next);
+});
+
+app.post("/api/admin/upload-question-media", (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "Aucun fichier recu." });
+  const mime = req.file.mimetype || "application/octet-stream";
+  const kind = mime.startsWith("video/") ? "video" : "image";
+  const asset = {
+    url: `/uploads/${req.file.filename}`,
+    name: sanitizeShortText(req.file.originalname || req.file.filename),
+    mime,
+    kind,
+    size: req.file.size || 0,
+  };
+  writeAudit("admin.upload.success", {
+    ip: getReqIp(req),
+    file: asset.name,
+    mime: asset.mime,
+    size: asset.size,
+  });
+  return res.json(asset);
+});
+
 app.use((err, _req, res, _next) => {
   appErrorCounter += 1;
   writeAppLog("ERROR", "http.error", { message: err?.message || "unknown" });
@@ -1474,8 +1603,9 @@ io.on("connection", (socket) => {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .map((q) => ({
         id: q.id,
-        text: questionTextForLang(q, DEFAULT_LANG),
+        text: questionPreviewForLang(q, DEFAULT_LANG),
         texts: normalizeQuestionTexts(q.texts, q.text || ""),
+        media: normalizeQuestionMedia(q.media),
         createdAt: q.createdAt,
         active: q.active,
         answersCount: (q.answers || []).length,
@@ -1486,22 +1616,25 @@ io.on("connection", (socket) => {
     socket.emit("report:list", publicReports(store));
   }
 
-  socket.on("question:add", ({ texts: payloadTexts, activateAt }) => {
+  socket.on("question:add", (payload) => {
     if (!allow("question:add", 20, 60_000)) return;
     if (!isAdminSocket(socket)) {
       writeAudit("admin.question_add.denied", { ip: socketIp });
       socket.emit("action:error", "Acces admin requis.");
       return;
     }
-    const texts = normalizeQuestionTexts(payloadTexts);
-    const safeActivateAt = normalizeISODate(activateAt);
-    if (activateAt && !safeActivateAt) {
+    const rawTexts = payload?.texts && typeof payload.texts === "object" ? payload.texts : null;
+    const texts = normalizeQuestionTexts(rawTexts);
+    const rawMedia = payload?.media && typeof payload.media === "object" ? payload.media : null;
+    const media = normalizeQuestionMedia(rawMedia);
+    const safeActivateAt = normalizeISODate(payload?.activateAt);
+    if (payload?.activateAt && !safeActivateAt) {
       socket.emit("action:error", "Date de programmation invalide.");
       return;
     }
-    const missing = SUPPORTED_LANGS.find((lang) => !texts[lang]);
+    const missing = SUPPORTED_LANGS.find((lang) => !questionHasContentForLang(texts, media, lang));
     if (missing) {
-      socket.emit("action:error", "Chaque question doit etre renseignee en francais, anglais, espagnol et arabe.");
+      socket.emit("action:error", "Chaque langue doit contenir soit un texte soit un media (image ou video).");
       return;
     }
 
@@ -1520,6 +1653,7 @@ io.on("connection", (socket) => {
       id: makeId("q"),
       text: texts[DEFAULT_LANG],
       texts,
+      media,
       createdAt: new Date().toISOString(),
       activateAt: safeActivateAt || null,
       active: !isFutureSchedule,

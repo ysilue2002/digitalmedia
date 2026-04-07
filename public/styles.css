@@ -75,6 +75,19 @@ p {
   gap: 0.65rem;
 }
 
+.lang-fieldset {
+  border: 1px solid rgba(16, 42, 67, 0.14);
+  border-radius: 16px;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.lang-fieldset legend {
+  padding: 0 0.5rem;
+  font-weight: 800;
+  color: rgba(9, 42, 66, 0.9);
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -211,6 +224,29 @@ button:hover {
   font-size: 1.1rem;
   margin: 0.6rem 0 1rem;
   font-weight: 700;
+}
+
+.question-media:empty {
+  display: none;
+}
+
+.question-media {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(12, 18, 28, 0.06);
+  box-shadow: 0 12px 26px rgba(10, 30, 60, 0.08);
+  margin: 0.6rem 0 0.75rem;
+}
+
+.question-media img,
+.question-media video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  object-fit: contain;
+  background: rgba(12, 18, 28, 0.85);
 }
 
 .answers {

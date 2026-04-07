@@ -109,6 +109,8 @@
       "ui.shareQuestion": "Partager cette question",
       "ui.shareSuccess": "Lien copie. Tu peux le partager.",
       "ui.shareUnsupported": "Partage indisponible sur cet appareil.",
+      "ui.media.image": "[Image]",
+      "ui.media.video": "[Video]",
       "share.header": "QDAY - Question du jour",
       "share.prompt": "Ton avis en 30 secondes.",
       "share.flow": "Pseudo + reponse + debat direct.",
@@ -222,6 +224,8 @@
       "ui.shareQuestion": "Share this question",
       "ui.shareSuccess": "Link copied. You can share it now.",
       "ui.shareUnsupported": "Sharing is not available on this device.",
+      "ui.media.image": "[Image]",
+      "ui.media.video": "[Video]",
       "share.header": "QDAY - Daily question",
       "share.prompt": "Your take in 30 seconds.",
       "share.flow": "Nickname + answer + real debate.",
@@ -333,6 +337,8 @@
       "ui.shareQuestion": "Compartir esta pregunta",
       "ui.shareSuccess": "Enlace copiado. Ya puedes compartirlo.",
       "ui.shareUnsupported": "Compartir no esta disponible en este dispositivo.",
+      "ui.media.image": "[Imagen]",
+      "ui.media.video": "[Video]",
       "share.header": "QDAY - Pregunta del dia",
       "share.prompt": "Tu opinion en 30 segundos.",
       "share.flow": "Alias + respuesta + debate directo.",
@@ -422,6 +428,8 @@
       "ui.shareQuestion": "مشاركة هذا السؤال",
       "ui.shareSuccess": "تم نسخ الرابط. يمكنك مشاركته الآن.",
       "ui.shareUnsupported": "المشاركة غير متاحة على هذا الجهاز.",
+      "ui.media.image": "[صورة]",
+      "ui.media.video": "[فيديو]",
       "share.header": "QDAY - سؤال اليوم",
       "share.prompt": "رأيك في 30 ثانية.",
       "share.flow": "اسم مستعار + إجابة + نقاش مباشر.",
@@ -778,9 +786,48 @@
     if (!node) return "";
     const texts = node && typeof node.texts === "object" ? node.texts : null;
     if (texts) {
-      return texts[currentLang] || texts[DEFAULT_LANG] || node.text || "";
+      const txt = texts[currentLang] || node.text || "";
+      if (txt) return txt;
+      const asset = mediaAssetForLang(node);
+      if (asset?.kind === "video") return t("ui.media.video");
+      if (asset?.kind === "image") return t("ui.media.image");
+      return "";
     }
     return node.text || "";
+  }
+
+  function mediaAssetForLang(question) {
+    if (!question || typeof question !== "object") return null;
+    const media = question && typeof question.media === "object" ? question.media : null;
+    const asset = media?.[currentLang]?.asset || media?.[DEFAULT_LANG]?.asset || null;
+    if (!asset || typeof asset.url !== "string" || !asset.url) return null;
+    return asset;
+  }
+
+  function renderQuestionMedia(question, container) {
+    if (!container) return;
+    container.textContent = "";
+    const asset = mediaAssetForLang(question);
+    if (!asset) return;
+
+    if (asset.kind === "image") {
+      const img = document.createElement("img");
+      img.src = asset.url;
+      img.alt = asset.name || "image";
+      img.loading = "lazy";
+      img.decoding = "async";
+      container.appendChild(img);
+      return;
+    }
+
+    if (asset.kind === "video") {
+      const video = document.createElement("video");
+      video.src = asset.url;
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      container.appendChild(video);
+    }
   }
 
   async function shareQuestion(question, mode = "live") {
@@ -1420,6 +1467,7 @@
 
   if (page === "/live.html") {
     const questionEl = document.getElementById("current-question");
+    const questionMediaEl = document.getElementById("current-question-media");
     const shareBtn = document.getElementById("share-current-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
@@ -1566,6 +1614,7 @@
       currentLiveQuestionId = question?.id || null;
       if (!question) {
         questionEl.textContent = t("ui.noActiveQuestion");
+        renderQuestionMedia(null, questionMediaEl);
         if (shareBtn) shareBtn.hidden = true;
         answersList.textContent = "";
         renderTypingIndicators();
@@ -1574,6 +1623,7 @@
       if (!visibleAnswersByQuestion.has(question.id)) {
         visibleAnswersByQuestion.set(question.id, ANSWERS_PAGE_SIZE);
       }
+      renderQuestionMedia(question, questionMediaEl);
       questionEl.textContent = textForLang(question);
       if (shareBtn) {
         shareBtn.hidden = false;
@@ -1595,9 +1645,11 @@
     window.addEventListener("qday:lang-changed", () => {
       if (!currentQuestion) {
         questionEl.textContent = t("ui.noActiveQuestion");
+        renderQuestionMedia(null, questionMediaEl);
         answersList.textContent = "";
         return;
       }
+      renderQuestionMedia(currentQuestion, questionMediaEl);
       questionEl.textContent = textForLang(currentQuestion);
       renderAnswers(currentQuestion, answersList, true);
     });
@@ -1607,6 +1659,7 @@
     const historyList = document.getElementById("history-list");
     const selectedTitle = document.getElementById("selected-title");
     const selectedQuestion = document.getElementById("selected-question");
+    const selectedQuestionMedia = document.getElementById("selected-question-media");
     const shareBtn = document.getElementById("share-selected-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
@@ -1711,6 +1764,7 @@
       currentHistoryQuestionId = question.id;
       window.location.hash = `q=${encodeURIComponent(question.id)}`;
       selectedTitle.textContent = question.active ? t("ui.statusCurrent") : t("ui.statusArchived");
+      renderQuestionMedia(question, selectedQuestionMedia);
       selectedQuestion.textContent = textForLang(question);
       if (shareBtn) {
         shareBtn.hidden = false;
@@ -1729,6 +1783,7 @@
     window.addEventListener("qday:lang-changed", () => {
       renderHistory(historyItemsCache);
       if (!selectedQuestionCache) return;
+      renderQuestionMedia(selectedQuestionCache, selectedQuestionMedia);
       selectedQuestion.textContent = textForLang(selectedQuestionCache);
       renderAnswers(selectedQuestionCache, answersList, true);
     });
