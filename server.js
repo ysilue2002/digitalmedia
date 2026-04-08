@@ -2377,6 +2377,29 @@ setInterval(() => {
   if (expiredRemoved || scheduledActivated || orphanRemoved > 0) {
     saveStore(store);
     if (scheduledActivated) {
+      const activeQ = getCurrentQuestion(store);
+      if (activeQ) {
+        const notifyStore = loadStore();
+        SUPPORTED_LANGS.forEach((lang) => {
+          const qText = questionTextForLang(activeQ, lang);
+          const asset = questionMediaForLang(activeQ, lang);
+          const body = (qText || "").slice(0, 180) || (asset?.kind === "video" ? "Nouvelle video" : "Nouvelle image");
+          const imageUrl = asset?.kind === "image" ? asset.url : null;
+          pushSendToSubs(
+            notifyStore,
+            (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.questions),
+            {
+              title: pushTitleForLang(lang),
+              body,
+              url: "/live.html",
+              type: "question",
+              lang,
+              tag: `qday-question-${lang}`,
+              imageUrl,
+            }
+          ).catch(() => {});
+        });
+      }
       broadcastState(store);
     } else {
       io.emit("ads:list", publicAds(store));
