@@ -47,6 +47,17 @@
       <p class="purpose-cta" data-i18n="home.purposeCta">Entre ton pseudo et prends la parole.</p>
     </section>
 
+    <section class="card install-card" id="install-card" hidden>
+      <h2 data-i18n="install.title">Installer QDAY</h2>
+      <p class="meta" id="install-hint" data-i18n="install.hint">
+        Installe l'application pour un acces rapide et des notifications.
+      </p>
+      <div class="install-actions">
+        <button id="install-app-btn" type="button" class="ghost-btn" data-i18n="install.button">Installer l'application</button>
+      </div>
+      <p class="meta" id="install-status" aria-live="polite"></p>
+    </section>
+
     <form id="login-form" class="stack">
       <label for="pseudo" data-i18n="common.pseudo">Pseudo</label>
       <input id="pseudo" name="pseudo" maxlength="40" required data-i18n-placeholder="common.pseudoExample" placeholder="ex: Alex" />

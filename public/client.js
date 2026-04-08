@@ -120,6 +120,12 @@
       "share.join": "Participe ici:",
       "contact.label": "Contact",
       "footer.rights": "tous droits reservés à SYM_CI",
+      "install.title": "Installer QDAY",
+      "install.hint": "Installe l'application pour un acces rapide et des notifications.",
+      "install.button": "Installer l'application",
+      "install.unavailable": "Installation indisponible ici. Ouvre QDAY dans Chrome (Android) ou Safari (iPhone/iPad).",
+      "install.ios": "Sur iPhone/iPad: Safari > Partager > Sur l'ecran d'accueil.",
+      "install.installed": "Application installee.",
       "notif.button": "Notifications",
       "notif.title": "Notifications QDAY",
       "notif.desc": "Active les alertes pour les nouvelles questions et l'activite en direct. (Langue: {lang})",
@@ -246,6 +252,12 @@
       "share.join": "Join here:",
       "contact.label": "Contact",
       "footer.rights": "All rights reserved to SYM_CI",
+      "install.title": "Install QDAY",
+      "install.hint": "Install the app for quick access and notifications.",
+      "install.button": "Install the app",
+      "install.unavailable": "Install is not available here. Open QDAY in Chrome (Android) or Safari (iPhone/iPad).",
+      "install.ios": "On iPhone/iPad: Safari > Share > Add to Home Screen.",
+      "install.installed": "App installed.",
       "notif.button": "Notifications",
       "notif.title": "QDAY notifications",
       "notif.desc": "Enable alerts for new questions and live activity. (Language: {lang})",
@@ -370,6 +382,12 @@
       "share.join": "Participa aqui:",
       "contact.label": "Contacto",
       "footer.rights": "Todos los derechos reservados a SYM_CI",
+      "install.title": "Instalar QDAY",
+      "install.hint": "Instala la app para acceso rapido y notificaciones.",
+      "install.button": "Instalar la aplicacion",
+      "install.unavailable": "La instalacion no esta disponible aqui. Abre QDAY en Chrome (Android) o Safari (iPhone/iPad).",
+      "install.ios": "En iPhone/iPad: Safari > Compartir > Anadir a pantalla de inicio.",
+      "install.installed": "App instalada.",
       "notif.button": "Notificaciones",
       "notif.title": "Notificaciones QDAY",
       "notif.desc": "Activa alertas para nuevas preguntas y actividad en directo. (Idioma: {lang})",
@@ -472,6 +490,12 @@
       "share.join": "شارك هنا:",
       "contact.label": "اتصال",
       "footer.rights": "جميع الحقوق محفوظة لـ SYM_CI",
+      "install.title": "تثبيت QDAY",
+      "install.hint": "ثبّت التطبيق للوصول السريع والإشعارات.",
+      "install.button": "تثبيت التطبيق",
+      "install.unavailable": "التثبيت غير متاح هنا. افتح QDAY في Chrome (Android) أو Safari (iPhone/iPad).",
+      "install.ios": "على iPhone/iPad: Safari > مشاركة > إضافة إلى الشاشة الرئيسية.",
+      "install.installed": "تم تثبيت التطبيق.",
       "notif.button": "الإشعارات",
       "notif.title": "إشعارات QDAY",
       "notif.desc": "فعّل التنبيهات للأسئلة الجديدة والنشاط المباشر. (اللغة: {lang})",
@@ -645,6 +669,9 @@
     })();
     refreshNotifUi();
   });
+
+  // Home install CTA
+  bindInstallButtonOnHome();
 
   socket.on("action:error", (message) => {
     const questionNotFound =
@@ -984,6 +1011,54 @@
       throw new Error(err.error || "Erreur push");
     }
     return true;
+  }
+
+  // PWA install prompt (Chrome/Edge on Android/desktop). Not supported on iOS.
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    // Prevent mini-infobar.
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const card = document.getElementById("install-card");
+    if (card) card.hidden = false;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    const status = document.getElementById("install-status");
+    if (status) status.textContent = t("install.installed");
+    const btn = document.getElementById("install-app-btn");
+    if (btn) btn.hidden = true;
+  });
+
+  function isProbablyIOS() {
+    const ua = navigator.userAgent || "";
+    return /iPad|iPhone|iPod/i.test(ua);
+  }
+
+  function bindInstallButtonOnHome() {
+    if (!(page === "/" || page === "/index.html")) return;
+    const card = document.getElementById("install-card");
+    const btn = document.getElementById("install-app-btn");
+    const status = document.getElementById("install-status");
+    if (!card || !btn || !status) return;
+
+    // Show card on home anyway; we will guide user if not installable.
+    card.hidden = false;
+    status.textContent = "";
+
+    btn.addEventListener("click", async () => {
+      if (deferredInstallPrompt) {
+        try {
+          deferredInstallPrompt.prompt();
+          await deferredInstallPrompt.userChoice.catch(() => {});
+        } catch {}
+        deferredInstallPrompt = null;
+        return;
+      }
+      // No programmatic prompt available: guide user.
+      status.textContent = isProbablyIOS() ? t("install.ios") : t("install.unavailable");
+    });
   }
 
   async function unsubscribeFromPush() {
