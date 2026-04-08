@@ -1042,7 +1042,7 @@ async function pushSendToSubs(store, filterFn, payload) {
       const subscription = row?.subscription;
       if (!subscription?.endpoint) continue;
       await webpush.sendNotification(subscription, JSON.stringify(payload), {
-        TTL: 60,
+        TTL: 300,
       });
       sent += 1;
     } catch (err) {
@@ -1401,10 +1401,19 @@ app.post("/api/admin/questions", (req, res) => {
       const qText = questionTextForLang(question, lang);
       const asset = questionMediaForLang(question, lang);
       const body = (qText || "").slice(0, 180) || (asset?.kind === "video" ? "Nouvelle video" : "Nouvelle image");
+      const imageUrl = asset?.kind === "image" ? asset.url : null;
       pushSendToSubs(
         notifyStore,
         (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.questions),
-        { title: pushTitleForLang(lang), body, url: "/live.html" }
+        {
+          title: pushTitleForLang(lang),
+          body,
+          url: "/live.html",
+          type: "question",
+          lang,
+          tag: `qday-question-${lang}`,
+          imageUrl,
+        }
       ).catch(() => {});
     });
   }
@@ -1433,10 +1442,19 @@ app.post("/api/admin/questions/:id/activate", (req, res) => {
       const qText = questionTextForLang(activeQ, lang);
       const asset = questionMediaForLang(activeQ, lang);
       const body = (qText || "").slice(0, 180) || (asset?.kind === "video" ? "Nouvelle video" : "Nouvelle image");
+      const imageUrl = asset?.kind === "image" ? asset.url : null;
       pushSendToSubs(
         notifyStore,
         (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.questions),
-        { title: pushTitleForLang(lang), body, url: "/live.html" }
+        {
+          title: pushTitleForLang(lang),
+          body,
+          url: "/live.html",
+          type: "question",
+          lang,
+          tag: `qday-question-${lang}`,
+          imageUrl,
+        }
       ).catch(() => {});
     });
   }
@@ -1924,6 +1942,9 @@ io.on("connection", (socket) => {
           ? `رد جديد: ${safeText.slice(0, 140)}`
           : `Nouvelle reponse: ${safeText.slice(0, 140)}`,
       url: "/live.html",
+      type: "activity",
+      lang: safeLang,
+      tag: `qday-activity-${safeLang}`,
     };
     const notifyStore = loadStore();
     pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
@@ -1973,6 +1994,9 @@ io.on("connection", (socket) => {
           ? `تعليق جديد: ${safeText.slice(0, 140)}`
           : `Nouveau commentaire: ${safeText.slice(0, 140)}`,
       url: "/live.html",
+      type: "activity",
+      lang: safeLang,
+      tag: `qday-activity-${safeLang}`,
     };
     const notifyStore = loadStore();
     pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(

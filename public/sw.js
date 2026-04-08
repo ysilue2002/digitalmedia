@@ -62,14 +62,24 @@ self.addEventListener("push", (event) => {
     data = { title: "QDAY", body: "Nouvelle activite." };
   }
   const title = data.title || "QDAY";
+  const tag = data.tag || (data.type ? `qday-${data.type}` : "qday");
   const options = {
     body: data.body || "",
-    icon: "/logo-qday.svg",
-    badge: "/logo-qday.svg",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag,
+    renotify: true,
+    vibrate: [80, 40, 80],
+    actions: [
+      { action: "open", title: "Ouvrir" },
+      { action: "reply", title: "Repondre" },
+    ],
+    timestamp: Date.now(),
     data: {
       url: data.url || "/live.html",
     },
   };
+  if (data.imageUrl) options.image = data.imageUrl;
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
@@ -92,4 +102,3 @@ self.addEventListener("notificationclick", (event) => {
     })()
   );
 });
-
