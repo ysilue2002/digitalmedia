@@ -210,6 +210,19 @@ app.use(
     },
   })
 );
+
+// PWA assets: explicit routes to guarantee correct Content-Type and caching behavior.
+app.get("/manifest.webmanifest", (_req, res) => {
+  res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=300");
+  return res.sendFile(path.join(PUBLIC_DIR, "manifest.webmanifest"));
+});
+
+app.get("/sw.js", (_req, res) => {
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  return res.sendFile(path.join(PUBLIC_DIR, "sw.js"));
+});
 app.use(express.static(PUBLIC_DIR));
 
 function parseCookies(rawCookie) {
