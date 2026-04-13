@@ -12,6 +12,11 @@
   const totalsEl = document.getElementById("dashboard-stats-totals");
   const pagesEl = document.getElementById("dashboard-stats-pages");
   const geoEl = document.getElementById("dashboard-stats-geo");
+  const pushStatsEl = document.getElementById("push-stats");
+  const pushTestForm = document.getElementById("push-test-form");
+  const pushTestLang = document.getElementById("push-test-lang");
+  const pushTestType = document.getElementById("push-test-type");
+  const pushTestResult = document.getElementById("push-test-result");
   const questionForm = document.getElementById("dashboard-question-form");
   const questionTextFr = document.getElementById("dashboard-question-text-fr");
   const questionTextEn = document.getElementById("dashboard-question-text-en");
@@ -457,12 +462,30 @@
     }
   }
 
+  async function renderPushStats() {
+    if (!pushStatsEl) return;
+    const stats = await api("/api/admin/push/stats");
+    pushStatsEl.textContent = "";
+    pushStatsEl.appendChild(articleLine("Push actif", stats.enabled ? "Oui" : "Non"));
+    pushStatsEl.appendChild(articleLine("Abonnes total", String(stats.total || 0)));
+    pushStatsEl.appendChild(
+      articleLine("Par langue", `FR: ${stats.byLang?.fr || 0} | EN: ${stats.byLang?.en || 0} | ES: ${stats.byLang?.es || 0} | AR: ${stats.byLang?.ar || 0}`)
+    );
+    pushStatsEl.appendChild(
+      articleLine(
+        "Preferences",
+        `Nouvelles questions: ${stats.prefs?.questions || 0} | Activite: ${stats.prefs?.activity || 0}`
+      )
+    );
+  }
+
   async function refreshAll() {
     const jobs = [];
     if (questionsEl) jobs.push(renderQuestions());
     if (adsEl) jobs.push(renderAds());
     if (reportsList || moderationSummaryEl) jobs.push(renderModerationDetails());
     if (totalsEl && pagesEl && geoEl) jobs.push(renderStats());
+    if (pushStatsEl) jobs.push(renderPushStats());
     await Promise.all(jobs);
   }
 
@@ -665,6 +688,25 @@
         socket.on("ads:list", () => refreshAll().catch(() => {}));
         socket.on("history:list", () => refreshAll().catch(() => {}));
         if (reportsList || moderationSummaryEl) socket.emit("report:list");
+      }
+
+      if (pushTestForm && pushTestLang && pushTestType) {
+        pushTestForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (pushTestResult) pushTestResult.textContent = "Envoi en cours...";
+          try {
+            const result = await api("/api/admin/push/test", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lang: pushTestLang.value, type: pushTestType.value }),
+            });
+            if (pushTestResult) pushTestResult.textContent = `OK. Notif envoyee a ~${result.sent || 0} abonne(s).`;
+          } catch (err) {
+            if (pushTestResult) pushTestResult.textContent = `Erreur: ${err.message || "inconnue"}`;
+          } finally {
+            renderPushStats().catch(() => {});
+          }
+        });
       }
     } catch (err) {
       alert(err.message || "Erreur");

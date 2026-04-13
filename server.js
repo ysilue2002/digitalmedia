@@ -1346,6 +1346,53 @@ app.get("/api/admin/stats", (req, res) => {
   return res.json(qdayTrafficSnapshot());
 });
 
+app.get("/api/admin/push/stats", (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
+  const store = loadStore();
+  const subs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  const byLang = { fr: 0, en: 0, es: 0, ar: 0 };
+  const prefs = { questions: 0, activity: 0 };
+  subs.forEach((s) => {
+    const lang = sanitizeLang(s?.lang);
+    if (byLang[lang] !== undefined) byLang[lang] += 1;
+    if (s?.prefs?.questions) prefs.questions += 1;
+    if (s?.prefs?.activity) prefs.activity += 1;
+  });
+  return res.json({
+    enabled: Boolean(pushEnabled),
+    total: subs.length,
+    byLang,
+    prefs,
+  });
+});
+
+app.post("/api/admin/push/test", (req, res) => {
+  if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
+  if (!pushEnabled) return res.status(503).json({ error: "Push desactive." });
+  const lang = sanitizeLang(req.body?.lang || DEFAULT_LANG);
+  const type = sanitizeShortText(req.body?.type) === "activity" ? "activity" : "question";
+  const store = loadStore();
+  const now = new Date().toISOString();
+  pushSendToSubs(
+    store,
+    (s) => sanitizeLang(s?.lang) === lang && Boolean(s?.prefs?.[type === "activity" ? "activity" : "questions"]),
+    {
+      title: `${pushTitleForLang(lang)} (TEST)`,
+      body: `Notification test ${lang.toUpperCase()} - ${now}`,
+      url: "/live.html",
+      type,
+      lang,
+      tag: `qday-test-${type}-${lang}`,
+    }
+  )
+    .then((r) => {
+      // Persist any cleanup of expired subscriptions.
+      saveStore(store);
+      return res.json({ ok: true, sent: r.sent });
+    })
+    .catch(() => res.status(500).json({ error: "Erreur push." }));
+});
+
 app.get("/api/admin/questions", (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
   const store = loadStore();

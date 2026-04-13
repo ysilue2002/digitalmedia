@@ -31,6 +31,25 @@
       <div id="dashboard-stats-pages" class="answers"></div>
       <h3>Trafic QDAY par pays/region</h3>
       <div id="dashboard-stats-geo" class="answers"></div>
+
+      <h3>Notifications Push (test)</h3>
+      <div id="push-stats" class="answers"></div>
+      <form id="push-test-form" class="stack">
+        <label for="push-test-lang">Langue</label>
+        <select id="push-test-lang">
+          <option value="fr">FR</option>
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+          <option value="ar">AR</option>
+        </select>
+        <label for="push-test-type">Type</label>
+        <select id="push-test-type">
+          <option value="question">Nouvelle question</option>
+          <option value="activity">Reponses/commentaires</option>
+        </select>
+        <button type="submit">Envoyer une notification test</button>
+        <div id="push-test-result" class="meta"></div>
+      </form>
     </section>
   </main>
 
