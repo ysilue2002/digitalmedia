@@ -1013,7 +1013,8 @@ function normalizePushPrefs(input) {
   const obj = input && typeof input === "object" ? input : {};
   return {
     questions: Boolean(obj.questions ?? true),
-    activity: Boolean(obj.activity ?? false),
+    activity: Boolean(obj.activity ?? true),
+    activityScope: obj.activityScope === "all" ? "all" : "followed",
   };
 }
 
@@ -1029,6 +1030,35 @@ function normalizePushSubscription(input) {
     endpoint,
     keys: { p256dh, auth },
   };
+}
+
+function normalizePushFollows(input) {
+  const arr = Array.isArray(input) ? input : [];
+  const out = [];
+  for (const row of arr) {
+    if (!row || typeof row !== "object") continue;
+    const questionId = sanitizeShortText(row.questionId).slice(0, 120);
+    const lang = sanitizeLang(row.lang);
+    if (!questionId) continue;
+    out.push({ questionId, lang });
+  }
+  // Deduplicate
+  const seen = new Set();
+  const dedup = [];
+  for (const f of out) {
+    const key = `${f.questionId}:${f.lang}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedup.push(f);
+  }
+  return dedup.slice(0, 200);
+}
+
+function subFollowsQuestion(sub, questionId, lang) {
+  const qid = sanitizeShortText(questionId).slice(0, 120);
+  const l = sanitizeLang(lang);
+  const follows = Array.isArray(sub?.follows) ? sub.follows : [];
+  return follows.some((f) => f && f.questionId === qid && sanitizeLang(f.lang) === l);
 }
 
 async function pushSendToSubs(store, filterFn, payload) {
@@ -1714,6 +1744,7 @@ app.post("/api/push/subscribe", apiLimiter, (req, res) => {
   if (!subscription) return res.status(400).json({ error: "Subscription invalide." });
   const lang = sanitizeLang(req.body?.lang);
   const prefs = normalizePushPrefs(req.body?.prefs);
+  const follows = normalizePushFollows(req.body?.follows);
   const safePseudo = sanitizeShortText(req.body?.pseudo).slice(0, 40);
   const id = pushSubIdFromEndpoint(subscription.endpoint);
   if (!id) return res.status(400).json({ error: "Subscription invalide." });
@@ -1726,6 +1757,7 @@ app.post("/api/push/subscribe", apiLimiter, (req, res) => {
     subscription,
     lang,
     prefs,
+    follows: follows.length ? follows : existing?.follows || [],
     pseudo: safePseudo || null,
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -1755,11 +1787,45 @@ app.post("/api/push/ping", apiLimiter, (req, res) => {
   if (existing) {
     existing.lang = sanitizeLang(req.body?.lang);
     existing.prefs = normalizePushPrefs(req.body?.prefs);
+    const follows = normalizePushFollows(req.body?.follows);
+    if (follows.length) existing.follows = follows;
     existing.updatedAt = new Date().toISOString();
     existing.lastIp = getReqIp(req);
     saveStore(store);
   }
   return res.json({ ok: true, enabled: true });
+});
+
+app.post("/api/push/follow", apiLimiter, (req, res) => {
+  if (!pushEnabled) return res.status(503).json({ error: "Push desactive." });
+  const subscription = normalizePushSubscription(req.body?.subscription);
+  if (!subscription) return res.status(400).json({ error: "Subscription invalide." });
+  const id = pushSubIdFromEndpoint(subscription.endpoint);
+  if (!id) return res.status(400).json({ error: "Subscription invalide." });
+  const questionId = sanitizeShortText(req.body?.questionId).slice(0, 120);
+  const lang = sanitizeLang(req.body?.lang);
+  const follow = Boolean(req.body?.follow);
+  if (!questionId) return res.status(400).json({ error: "Question invalide." });
+
+  const store = loadStore();
+  store.pushSubs = Array.isArray(store.pushSubs) ? store.pushSubs : [];
+  const existing = store.pushSubs.find((s) => s.id === id);
+  if (!existing) return res.status(404).json({ error: "Subscription introuvable." });
+  existing.follows = Array.isArray(existing.follows) ? existing.follows : [];
+  const key = `${questionId}:${lang}`;
+  const before = existing.follows.length;
+  if (follow) {
+    if (!existing.follows.some((f) => `${f.questionId}:${sanitizeLang(f.lang)}` === key)) {
+      existing.follows.push({ questionId, lang });
+    }
+  } else {
+    existing.follows = existing.follows.filter((f) => `${f.questionId}:${sanitizeLang(f.lang)}` !== key);
+  }
+  if (existing.follows.length !== before) {
+    existing.updatedAt = new Date().toISOString();
+    saveStore(store);
+  }
+  return res.json({ ok: true, follow, questionId, lang });
 });
 
 app.post("/api/push/unsubscribe", apiLimiter, (req, res) => {
@@ -2012,9 +2078,17 @@ io.on("connection", (socket) => {
       tag: `qday-activity-${safeLang}`,
     };
     const notifyStore = loadStore();
-    pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
-      () => {}
-    );
+    pushSendToSubs(
+      notifyStore,
+      (s) => {
+        if (sanitizeLang(s?.lang) !== safeLang) return false;
+        if (!s?.prefs?.activity) return false;
+        if (String(s?.pseudo || "").toLowerCase() === safeAuthor.toLowerCase()) return false;
+        if (s?.prefs?.activityScope === "all") return true;
+        return subFollowsQuestion(s, question.id, safeLang);
+      },
+      { ...payload, questionId: question.id }
+    ).catch(() => {});
   });
 
   socket.on("comment:add", ({ questionId, answerId, text, author, lang }) => {
@@ -2065,9 +2139,17 @@ io.on("connection", (socket) => {
       tag: `qday-activity-${safeLang}`,
     };
     const notifyStore = loadStore();
-    pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
-      () => {}
-    );
+    pushSendToSubs(
+      notifyStore,
+      (s) => {
+        if (sanitizeLang(s?.lang) !== safeLang) return false;
+        if (!s?.prefs?.activity) return false;
+        if (String(s?.pseudo || "").toLowerCase() === safeAuthor.toLowerCase()) return false;
+        if (s?.prefs?.activityScope === "all") return true;
+        return subFollowsQuestion(s, question.id, safeLang);
+      },
+      { ...payload, questionId: question.id }
+    ).catch(() => {});
   });
 
   socket.on("reaction:add", ({ questionId, answerId, commentId, emoji, author, lang }) => {

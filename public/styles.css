@@ -385,6 +385,10 @@ button:hover {
   white-space: nowrap;
 }
 
+.follow-btn {
+  margin-top: 0.55rem;
+}
+
 .pinned-badge {
   display: inline-flex;
   align-items: center;

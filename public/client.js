@@ -120,6 +120,10 @@
       "cta.emptyBody": "Personne n'a encore repondu dans cette langue. Balance ton avis et lance le thread.",
       "invite.button": "Inviter 5 amis",
       "invite.copied": "Invitation copiee. Partage-la sur WhatsApp, Snapchat ou Insta.",
+      "follow.button": "Suivre cette question",
+      "follow.on": "Suivi actif",
+      "follow.off": "Suivi desactive",
+      "follow.needNotif": "Active d'abord les notifications pour suivre et etre notifie.",
       "pin.label": "EPINGLE",
       "pin.action": "Epingler",
       "unpin.action": "Desepingler",
@@ -261,6 +265,10 @@
       "cta.emptyBody": "No one has answered in this language yet. Drop your take and start the thread.",
       "invite.button": "Invite 5 friends",
       "invite.copied": "Invite copied. Share it on WhatsApp, Snapchat or IG.",
+      "follow.button": "Follow this question",
+      "follow.on": "Following",
+      "follow.off": "Not following",
+      "follow.needNotif": "Enable notifications first to follow and get updates.",
       "pin.label": "PINNED",
       "pin.action": "Pin",
       "unpin.action": "Unpin",
@@ -400,6 +408,10 @@
       "cta.emptyBody": "Aun no hay respuestas en este idioma. Deja tu opinion y abre el hilo.",
       "invite.button": "Invitar a 5 amigos",
       "invite.copied": "Invitacion copiada. Compartela en WhatsApp, Snapchat o IG.",
+      "follow.button": "Seguir esta pregunta",
+      "follow.on": "Siguiendo",
+      "follow.off": "No siguiendo",
+      "follow.needNotif": "Activa notificaciones primero para seguir y recibir alertas.",
       "pin.label": "FIJADO",
       "pin.action": "Fijar",
       "unpin.action": "Desfijar",
@@ -517,6 +529,10 @@
       "cta.emptyBody": "لا توجد إجابات بهذه اللغة بعد. اكتب رأيك وابدأ النقاش.",
       "invite.button": "دعوة 5 أصدقاء",
       "invite.copied": "تم نسخ الدعوة. شاركها على واتساب أو سناب أو إنستغرام.",
+      "follow.button": "متابعة هذا السؤال",
+      "follow.on": "متابعة مفعّلة",
+      "follow.off": "غير متابع",
+      "follow.needNotif": "فعّل الإشعارات أولا لتتمكن من المتابعة وتلقي التنبيهات.",
       "pin.label": "مثبّت",
       "pin.action": "تثبيت",
       "unpin.action": "إلغاء التثبيت",
@@ -701,7 +717,7 @@
         await fetch("/api/push/ping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+          body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), follows: Array.from(getFollowSet()), pseudo }),
         });
       } catch {}
     })();
@@ -1130,6 +1146,7 @@
       subscription,
       lang: currentLang,
       prefs,
+      follows: Array.from(getFollowSet()),
       pseudo,
     };
     const res = await fetch("/api/push/subscribe", {
@@ -1154,7 +1171,7 @@
       await fetch("/api/push/ping", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: existing, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+        body: JSON.stringify({ subscription: existing, lang: currentLang, prefs: getNotifPrefs(), follows: Array.from(getFollowSet()), pseudo }),
       }).catch(() => {});
       return true;
     }
@@ -1167,7 +1184,7 @@
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+      body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), follows: Array.from(getFollowSet()), pseudo }),
     }).catch(() => {});
     return true;
   }
@@ -1178,6 +1195,63 @@
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
     return Boolean(sub);
+  }
+
+  function getFollowSet() {
+    try {
+      const raw = localStorage.getItem("qday:follows");
+      const arr = raw ? JSON.parse(raw) : [];
+      const set = new Set();
+      (Array.isArray(arr) ? arr : []).forEach((k) => {
+        if (typeof k === "string" && k.includes(":")) set.add(k);
+      });
+      return set;
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveFollowSet(set) {
+    const arr = Array.from(set.values()).slice(0, 200);
+    localStorage.setItem("qday:follows", JSON.stringify(arr));
+  }
+
+  function followKey(questionId, lang) {
+    return `${String(questionId || "").trim()}:${normalizeLang(lang)}`;
+  }
+
+  async function setFollowOnServer(questionId, lang, follow) {
+    if (!supportsPush()) throw new Error("push.unsupported");
+    if (Notification.permission !== "granted") throw new Error("push.denied");
+    const reg = await ensureServiceWorker();
+    if (!reg) throw new Error("push.sw");
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) throw new Error("push.nosub");
+    const res = await fetch("/api/push/follow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub, questionId, lang, follow: Boolean(follow) }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Erreur follow" }));
+      throw new Error(err.error || "Erreur follow");
+    }
+    return res.json();
+  }
+
+  function updateFollowButton(btn, isOn) {
+    if (!btn) return;
+    btn.dataset.on = isOn ? "true" : "false";
+    btn.textContent = isOn ? t("follow.on") : t("follow.button");
+  }
+
+  function reactionScore(node) {
+    const r = reactionsFor(node);
+    let sum = 0;
+    Object.values(r).forEach((n) => {
+      sum += Number(n || 0);
+    });
+    return sum;
   }
 
   // PWA install prompt (Chrome/Edge on Android/desktop). Not supported on iOS.
@@ -1574,10 +1648,15 @@
       return;
     }
 
+    const topByReactions = answers.slice().sort((a, b) => reactionScore(b) - reactionScore(a)).slice(0, 1)[0] || null;
+    const firstByTime = answers.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).slice(0, 1)[0] || null;
+
     const sortedAnswers = answers.slice().sort((a, b) => {
       const ap = Boolean(a.pinned);
       const bp = Boolean(b.pinned);
       if (ap !== bp) return ap ? -1 : 1; // pinned first
+      const scoreDiff = reactionScore(b) - reactionScore(a);
+      if (scoreDiff !== 0) return scoreDiff; // top answers next
       return new Date(a.createdAt) - new Date(b.createdAt);
     });
     const visibleCount = visibleAnswersByQuestion.get(question.id) || ANSWERS_PAGE_SIZE;
@@ -1604,6 +1683,18 @@
           const badge = document.createElement("span");
           badge.className = "pinned-badge";
           badge.textContent = t("pin.label");
+          top.appendChild(badge);
+        }
+        if (topByReactions && topByReactions.id === answer.id && reactionScore(answer) > 0) {
+          const badge = document.createElement("span");
+          badge.className = "pinned-badge";
+          badge.textContent = "TOP";
+          top.appendChild(badge);
+        }
+        if (firstByTime && firstByTime.id === answer.id) {
+          const badge = document.createElement("span");
+          badge.className = "pinned-badge";
+          badge.textContent = "1ST";
           top.appendChild(badge);
         }
 
@@ -2070,6 +2161,7 @@
     const questionEl = document.getElementById("current-question");
     const questionMediaEl = document.getElementById("current-question-media");
     const shareBtn = document.getElementById("share-current-question");
+    const followBtn = document.getElementById("follow-current-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
     const answerText = document.getElementById("answer-text");
@@ -2256,6 +2348,7 @@
         questionEl.textContent = t("ui.noActiveQuestion");
         renderQuestionMedia(null, questionMediaEl);
         if (shareBtn) shareBtn.hidden = true;
+        if (followBtn) followBtn.hidden = true;
         answersList.textContent = "";
         if (participationPanel) participationPanel.hidden = true;
         renderTypingIndicators();
@@ -2282,6 +2375,31 @@
           shareQuestion(currentQuestion, "live").catch(() => {});
         };
       }
+      if (followBtn) {
+        followBtn.hidden = false;
+        const follows = getFollowSet();
+        const key = followKey(currentQuestion.id, currentLang);
+        updateFollowButton(followBtn, follows.has(key));
+        followBtn.onclick = async () => {
+          try {
+            if (Notification.permission !== "granted") {
+              const backdrop = document.getElementById("notif-backdrop");
+              if (backdrop) backdrop.hidden = false;
+              alert(t("follow.needNotif"));
+              return;
+            }
+            const nextOn = !getFollowSet().has(key);
+            await setFollowOnServer(currentQuestion.id, currentLang, nextOn);
+            const s = getFollowSet();
+            if (nextOn) s.add(key);
+            else s.delete(key);
+            saveFollowSet(s);
+            updateFollowButton(followBtn, nextOn);
+          } catch (e) {
+            alert(String(e?.message || "Erreur"));
+          }
+        };
+      }
       renderAnswers(question, answersList, true);
       renderTypingIndicators();
     });
@@ -2301,6 +2419,10 @@
         if (participationPanel) participationPanel.hidden = true;
         return;
       }
+      if (followBtn) {
+        const key = followKey(currentQuestion.id, currentLang);
+        updateFollowButton(followBtn, getFollowSet().has(key));
+      }
       if (participationPanel && participationTitle && participationBody) {
         const count = (currentQuestion?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
         participationPanel.hidden = false;
@@ -2319,6 +2441,7 @@
     const selectedQuestion = document.getElementById("selected-question");
     const selectedQuestionMedia = document.getElementById("selected-question-media");
     const shareBtn = document.getElementById("share-selected-question");
+    const followBtn = document.getElementById("follow-selected-question");
     const answersList = document.getElementById("answers-list");
     const answerForm = document.getElementById("answer-form");
     const answerText = document.getElementById("answer-text");
@@ -2477,6 +2600,30 @@
           shareQuestion(selectedQuestionCache, "history").catch(() => {});
         };
       }
+      if (followBtn) {
+        followBtn.hidden = false;
+        const key = followKey(question.id, currentLang);
+        updateFollowButton(followBtn, getFollowSet().has(key));
+        followBtn.onclick = async () => {
+          try {
+            if (Notification.permission !== "granted") {
+              const backdrop = document.getElementById("notif-backdrop");
+              if (backdrop) backdrop.hidden = false;
+              alert(t("follow.needNotif"));
+              return;
+            }
+            const nextOn = !getFollowSet().has(key);
+            await setFollowOnServer(question.id, currentLang, nextOn);
+            const s = getFollowSet();
+            if (nextOn) s.add(key);
+            else s.delete(key);
+            saveFollowSet(s);
+            updateFollowButton(followBtn, nextOn);
+          } catch (e) {
+            alert(String(e?.message || "Erreur"));
+          }
+        };
+      }
       answerForm.hidden = false;
       if (!visibleAnswersByQuestion.has(question.id)) {
         visibleAnswersByQuestion.set(question.id, ANSWERS_PAGE_SIZE);
@@ -2488,6 +2635,10 @@
     window.addEventListener("qday:lang-changed", () => {
       renderHistory(historyItemsCache);
       if (!selectedQuestionCache) return;
+      if (followBtn) {
+        const key = followKey(selectedQuestionCache.id, currentLang);
+        updateFollowButton(followBtn, getFollowSet().has(key));
+      }
       if (participationPanel && participationTitle && participationBody) {
         const count = (selectedQuestionCache?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
         participationPanel.hidden = false;
