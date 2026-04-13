@@ -1080,10 +1080,11 @@
       const parsed = raw ? JSON.parse(raw) : {};
       return {
         questions: Boolean(parsed?.questions ?? true),
-        activity: Boolean(parsed?.activity ?? false),
+        // Default ON: user can disable later.
+        activity: Boolean(parsed?.activity ?? true),
       };
     } catch {
-      return { questions: true, activity: false };
+      return { questions: true, activity: true };
     }
   }
 
@@ -1112,7 +1113,8 @@
   async function subscribeToPush() {
     const reg = await ensureServiceWorker();
     if (!reg) throw new Error("push.sw");
-    const permission = await Notification.requestPermission();
+    // Called from a user gesture (click). If already granted, don't prompt again.
+    const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
     if (permission !== "granted") throw new Error("push.denied");
 
     const publicKey = await getVapidPublicKey();
@@ -1140,6 +1142,42 @@
       throw new Error(err.error || "Erreur push");
     }
     return true;
+  }
+
+  async function autoSubscribeIfGranted() {
+    if (!supportsPush()) return false;
+    if (Notification.permission !== "granted") return false;
+    const reg = await ensureServiceWorker();
+    if (!reg) return false;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      await fetch("/api/push/ping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: existing, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+      }).catch(() => {});
+      return true;
+    }
+    const publicKey = await getVapidPublicKey();
+    if (!publicKey) return false;
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription, lang: currentLang, prefs: getNotifPrefs(), pseudo }),
+    }).catch(() => {});
+    return true;
+  }
+
+  async function isPushSubscribed() {
+    if (!supportsPush()) return false;
+    const reg = await ensureServiceWorker();
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return Boolean(sub);
   }
 
   // PWA install prompt (Chrome/Edge on Android/desktop). Not supported on iOS.
@@ -2047,6 +2085,7 @@
     ensureNotifModal();
     bindNotifModalInteractions();
     refreshNotifUi();
+    autoSubscribeIfGranted().then(() => refreshNotifUi()).catch(() => {});
     const notifBtn = document.getElementById("notif-btn");
     if (notifBtn) {
       notifBtn.addEventListener("click", () => {
@@ -2056,6 +2095,25 @@
         refreshNotifUi();
       });
     }
+
+    // Auto-prompt once (can't auto-enable permission, but we can show the modal).
+    (async () => {
+      try {
+        const prompted = localStorage.getItem("qday:notif:prompted") === "1";
+        if (prompted) return;
+        if (!supportsPush()) return;
+        if (Notification.permission === "denied") return;
+        const subscribed = await isPushSubscribed();
+        if (subscribed) return;
+        localStorage.setItem("qday:notif:prompted", "1");
+        setTimeout(() => {
+          const backdrop = document.getElementById("notif-backdrop");
+          if (!backdrop) return;
+          backdrop.hidden = false;
+          refreshNotifUi();
+        }, 1200);
+      } catch {}
+    })();
 
     const adminPanel = document.getElementById("admin-panel");
     if (isAdminPseudo && adminPanel) {
@@ -2278,6 +2336,7 @@
     ensureNotifModal();
     bindNotifModalInteractions();
     refreshNotifUi();
+    autoSubscribeIfGranted().then(() => refreshNotifUi()).catch(() => {});
     const notifBtn = document.getElementById("notif-btn");
     if (notifBtn) {
       notifBtn.addEventListener("click", () => {
@@ -2287,6 +2346,24 @@
         refreshNotifUi();
       });
     }
+
+    (async () => {
+      try {
+        const prompted = localStorage.getItem("qday:notif:prompted") === "1";
+        if (prompted) return;
+        if (!supportsPush()) return;
+        if (Notification.permission === "denied") return;
+        const subscribed = await isPushSubscribed();
+        if (subscribed) return;
+        localStorage.setItem("qday:notif:prompted", "1");
+        setTimeout(() => {
+          const backdrop = document.getElementById("notif-backdrop");
+          if (!backdrop) return;
+          backdrop.hidden = false;
+          refreshNotifUi();
+        }, 1200);
+      } catch {}
+    })();
 
     if (isAdminPseudo) {
       fetch("/api/admin/status")
