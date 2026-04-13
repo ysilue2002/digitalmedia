@@ -55,6 +55,7 @@ const DEFAULT_LANG = "fr";
 const SUPPORTED_LANGS = ["fr", "en", "es", "ar"];
 const QUESTION_MEDIA_ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"]);
 const QUESTION_MEDIA_ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm"]);
+const REACTION_EMOJIS = new Set(["👍", "❤️", "😂", "😮", "😢", "😡"]);
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:digitalmediaci@proton.me";
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -1090,6 +1091,18 @@ function getCommentById(answer, commentId) {
   return (answer?.comments || []).find((c) => c.id === commentId) || null;
 }
 
+function normalizeReactions(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const out = {};
+  for (const [k, v] of Object.entries(source)) {
+    if (!REACTION_EMOJIS.has(k)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    out[k] = Math.min(1_000_000_000, Math.floor(n));
+  }
+  return out;
+}
+
 function publicQuestion(question) {
   const texts = normalizeQuestionTexts(question.texts, question.text || "");
   const media = normalizeQuestionMedia(question.media);
@@ -1106,12 +1119,15 @@ function publicQuestion(question) {
       author: a.author,
       lang: sanitizeLang(a.lang),
       createdAt: a.createdAt,
+      pinned: Boolean(a.pinned),
+      reactions: normalizeReactions(a.reactions),
       comments: (a.comments || []).map((c) => ({
         id: c.id,
         text: c.text,
         author: c.author,
         lang: sanitizeLang(c.lang),
         createdAt: c.createdAt,
+        reactions: normalizeReactions(c.reactions),
       })),
     })),
   };
@@ -1925,6 +1941,8 @@ io.on("connection", (socket) => {
       lang: safeLang,
       createdAt: new Date().toISOString(),
       comments: [],
+      pinned: false,
+      reactions: {},
     });
     saveStore(currentStore);
     io.emit("question:updated", publicQuestion(question));
@@ -1977,6 +1995,7 @@ io.on("connection", (socket) => {
       author: safeAuthor,
       lang: safeLang,
       createdAt: new Date().toISOString(),
+      reactions: {},
     });
     saveStore(currentStore);
     io.emit("question:updated", publicQuestion(question));
@@ -2002,6 +2021,56 @@ io.on("connection", (socket) => {
     pushSendToSubs(notifyStore, (s) => sanitizeLang(s?.lang) === safeLang && Boolean(s?.prefs?.activity), payload).catch(
       () => {}
     );
+  });
+
+  socket.on("reaction:add", ({ questionId, answerId, commentId, emoji, author, lang }) => {
+    if (!allow("reaction:add", 240, 60_000)) return;
+    const safeQuestionId = sanitizeShortText(questionId).slice(0, 120);
+    const safeAnswerId = sanitizeShortText(answerId).slice(0, 120);
+    const safeCommentId = sanitizeShortText(commentId).slice(0, 120) || null;
+    const safeEmoji = sanitizeShortText(emoji);
+    const safeAuthor = sanitizeShortText(author).slice(0, 40);
+    const safeLang = sanitizeLang(lang);
+    if (!safeQuestionId || !safeAnswerId || !safeEmoji || !safeAuthor) return;
+    if (!REACTION_EMOJIS.has(safeEmoji)) return;
+
+    const currentStore = loadStore();
+    const question = getQuestionById(currentStore, safeQuestionId);
+    if (!question) return;
+    const answer = getAnswerById(question, safeAnswerId);
+    if (!answer) return;
+
+    const target = safeCommentId ? getCommentById(answer, safeCommentId) : answer;
+    if (!target) return;
+    // Keep reactions scoped to current language view to avoid cross-language noise.
+    if (sanitizeLang(target.lang) !== safeLang) return;
+
+    target.reactions = target.reactions && typeof target.reactions === "object" ? target.reactions : {};
+    target.reactions[safeEmoji] = Math.min(1_000_000_000, Number(target.reactions[safeEmoji] || 0) + 1);
+    saveStore(currentStore);
+    io.emit("question:updated", publicQuestion(question));
+  });
+
+  socket.on("answer:pin", ({ questionId, answerId, pinned }) => {
+    if (!allow("answer:pin", 120, 60_000)) return;
+    if (!isAdminSocket(socket)) {
+      socket.emit("action:error", "Acces admin requis.");
+      return;
+    }
+    const safeQuestionId = sanitizeShortText(questionId).slice(0, 120);
+    const safeAnswerId = sanitizeShortText(answerId).slice(0, 120);
+    if (!safeQuestionId || !safeAnswerId) return;
+
+    const currentStore = loadStore();
+    const question = getQuestionById(currentStore, safeQuestionId);
+    if (!question) return;
+    const answer = getAnswerById(question, safeAnswerId);
+    if (!answer) return;
+
+    answer.pinned = Boolean(pinned);
+    saveStore(currentStore);
+    writeAudit("admin.answer.pin", { ip: socketIp, questionId: safeQuestionId, answerId: safeAnswerId, pinned: answer.pinned });
+    io.emit("question:updated", publicQuestion(question));
   });
 
   socket.on("report:add", ({ questionId, answerId, commentId, reason, details, author }) => {

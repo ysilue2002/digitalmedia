@@ -360,6 +360,75 @@ button:hover {
   background: rgba(12, 18, 28, 0.85);
 }
 
+.participation-panel[hidden] {
+  display: none;
+}
+
+.participation-panel {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(16, 42, 67, 0.12);
+  border-radius: 16px;
+  padding: 0.75rem 0.8rem;
+  background: linear-gradient(135deg, rgba(14, 159, 142, 0.12), rgba(11, 127, 143, 0.08));
+  margin: 0.65rem 0 0.8rem;
+}
+
+.participation-copy strong {
+  display: block;
+  font-weight: 900;
+}
+
+.invite-btn {
+  white-space: nowrap;
+}
+
+.pinned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 42, 67, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(9, 42, 66, 0.92);
+  font-weight: 900;
+  font-size: 0.78rem;
+}
+
+.reaction-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(16, 42, 67, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 800;
+}
+
+.reaction-chip[data-picked="true"] {
+  background: rgba(14, 159, 142, 0.18);
+  border-color: rgba(14, 159, 142, 0.5);
+}
+
+.reaction-chip .count {
+  font-size: 0.8rem;
+  color: rgba(9, 42, 66, 0.78);
+}
+
 .answers {
   display: grid;
   gap: 0.82rem;

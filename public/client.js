@@ -114,6 +114,15 @@
       "ui.shareUnsupported": "Partage indisponible sur cet appareil.",
       "ui.media.image": "[Image]",
       "ui.media.video": "[Video]",
+      "cta.title": "A toi de lancer le debat",
+      "cta.body": "Reponds, commente, et invite tes amis: on veut des avis reels, pas des robots.",
+      "cta.emptyTitle": "Sois le premier",
+      "cta.emptyBody": "Personne n'a encore repondu dans cette langue. Balance ton avis et lance le thread.",
+      "invite.button": "Inviter 5 amis",
+      "invite.copied": "Invitation copiee. Partage-la sur WhatsApp, Snapchat ou Insta.",
+      "pin.label": "EPINGLE",
+      "pin.action": "Epingler",
+      "unpin.action": "Desepingler",
       "share.header": "QDAY - Question du jour",
       "share.prompt": "Ton avis en 30 secondes.",
       "share.flow": "Pseudo + reponse + debat direct.",
@@ -246,6 +255,15 @@
       "ui.shareUnsupported": "Sharing is not available on this device.",
       "ui.media.image": "[Image]",
       "ui.media.video": "[Video]",
+      "cta.title": "Start the debate",
+      "cta.body": "Answer, comment, and invite friends. Real takes only.",
+      "cta.emptyTitle": "Be the first",
+      "cta.emptyBody": "No one has answered in this language yet. Drop your take and start the thread.",
+      "invite.button": "Invite 5 friends",
+      "invite.copied": "Invite copied. Share it on WhatsApp, Snapchat or IG.",
+      "pin.label": "PINNED",
+      "pin.action": "Pin",
+      "unpin.action": "Unpin",
       "share.header": "QDAY - Daily question",
       "share.prompt": "Your take in 30 seconds.",
       "share.flow": "Nickname + answer + real debate.",
@@ -376,6 +394,15 @@
       "ui.shareUnsupported": "Compartir no esta disponible en este dispositivo.",
       "ui.media.image": "[Imagen]",
       "ui.media.video": "[Video]",
+      "cta.title": "Lanza el debate",
+      "cta.body": "Responde, comenta e invita a tus amigos. Opiniones reales.",
+      "cta.emptyTitle": "Se el primero",
+      "cta.emptyBody": "Aun no hay respuestas en este idioma. Deja tu opinion y abre el hilo.",
+      "invite.button": "Invitar a 5 amigos",
+      "invite.copied": "Invitacion copiada. Compartela en WhatsApp, Snapchat o IG.",
+      "pin.label": "FIJADO",
+      "pin.action": "Fijar",
+      "unpin.action": "Desfijar",
       "share.header": "QDAY - Pregunta del dia",
       "share.prompt": "Tu opinion en 30 segundos.",
       "share.flow": "Alias + respuesta + debate directo.",
@@ -484,6 +511,15 @@
       "ui.shareUnsupported": "المشاركة غير متاحة على هذا الجهاز.",
       "ui.media.image": "[صورة]",
       "ui.media.video": "[فيديو]",
+      "cta.title": "ابدأ النقاش",
+      "cta.body": "أجب وعلّق وادعُ أصدقاءك. نريد آراء حقيقية.",
+      "cta.emptyTitle": "كن الأول",
+      "cta.emptyBody": "لا توجد إجابات بهذه اللغة بعد. اكتب رأيك وابدأ النقاش.",
+      "invite.button": "دعوة 5 أصدقاء",
+      "invite.copied": "تم نسخ الدعوة. شاركها على واتساب أو سناب أو إنستغرام.",
+      "pin.label": "مثبّت",
+      "pin.action": "تثبيت",
+      "unpin.action": "إلغاء التثبيت",
       "share.header": "QDAY - سؤال اليوم",
       "share.prompt": "رأيك في 30 ثانية.",
       "share.flow": "اسم مستعار + إجابة + نقاش مباشر.",
@@ -535,9 +571,11 @@
     "history-right-bottom": "Historique bas droite",
   };
   const QUICK_EMOJIS = ["👍", "❤️", "😂", "🔥", "👏", "🙏", "🎉", "😮", "😢", "😡"];
+  const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡"];
   const ANSWERS_PAGE_SIZE = 6;
   let latestAds = [];
   const visibleAnswersByQuestion = new Map();
+  const myReactions = new Map(); // targetKey -> emoji
   let hasAdminRights = false;
   const typingMap = new Map();
   let currentLiveQuestionId = null;
@@ -886,6 +924,97 @@
       return "";
     }
     return node.text || "";
+  }
+
+  function reactionsFor(node) {
+    const raw = node && typeof node.reactions === "object" && node.reactions ? node.reactions : {};
+    const out = {};
+    REACTION_EMOJIS.forEach((e) => {
+      const n = Number(raw[e] || 0);
+      out[e] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    });
+    return out;
+  }
+
+  function targetKey(questionId, answerId, commentId) {
+    return `${questionId || ""}:${answerId || ""}:${commentId || ""}`;
+  }
+
+  function renderReactionBar({ questionId, answerId, commentId, node }) {
+    const bar = document.createElement("div");
+    bar.className = "reaction-bar";
+    const counts = reactionsFor(node);
+    const key = targetKey(questionId, answerId, commentId);
+    const picked = myReactions.get(key) || null;
+
+    REACTION_EMOJIS.forEach((emoji) => {
+      const chip = document.createElement("div");
+      chip.className = "reaction-chip";
+      chip.dataset.picked = picked === emoji ? "true" : "false";
+      chip.setAttribute("role", "button");
+      chip.setAttribute("tabindex", "0");
+      chip.setAttribute("aria-label", `Reaction ${emoji}`);
+
+      const label = document.createElement("span");
+      label.textContent = emoji;
+      const count = document.createElement("span");
+      count.className = "count";
+      count.textContent = counts[emoji] ? String(counts[emoji]) : "";
+
+      chip.appendChild(label);
+      chip.appendChild(count);
+
+      const send = () => {
+        if (!socket) return;
+        if (myReactions.get(key)) return;
+        myReactions.set(key, emoji);
+        chip.dataset.picked = "true";
+        socket.emit("reaction:add", {
+          questionId,
+          answerId,
+          commentId: commentId || null,
+          emoji,
+          author: pseudo,
+          lang: currentLang,
+        });
+      };
+
+      chip.addEventListener("click", send);
+      chip.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        send();
+      });
+
+      bar.appendChild(chip);
+    });
+    return bar;
+  }
+
+  async function inviteFriends(question) {
+    const q = textForLang(question) || t("live.currentQuestion");
+    const url = window.location.origin.endsWith("/") ? window.location.origin : `${window.location.origin}/`;
+    const text =
+      `${t("share.header")}\n` +
+      `"${q}"\n` +
+      `${t("share.prompt")}\n` +
+      `${t("share.flow")}\n` +
+      `${t("share.join")} ${url}\n` +
+      `#QDAY #QuestionDuJour #Debat`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t("share.header"), text, url });
+        return;
+      } catch {}
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert(t("invite.copied"));
+        return;
+      } catch {}
+    }
+    alert(t("ui.shareUnsupported"));
   }
 
   function mediaAssetForLang(question) {
@@ -1407,7 +1536,12 @@
       return;
     }
 
-    const sortedAnswers = answers.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const sortedAnswers = answers.slice().sort((a, b) => {
+      const ap = Boolean(a.pinned);
+      const bp = Boolean(b.pinned);
+      if (ap !== bp) return ap ? -1 : 1; // pinned first
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
     const visibleCount = visibleAnswersByQuestion.get(question.id) || ANSWERS_PAGE_SIZE;
     const slicedAnswers = sortedAnswers.slice(0, visibleCount);
 
@@ -1428,7 +1562,23 @@
         top.appendChild(avatar);
         top.appendChild(meta);
 
+        if (answer.pinned) {
+          const badge = document.createElement("span");
+          badge.className = "pinned-badge";
+          badge.textContent = t("pin.label");
+          top.appendChild(badge);
+        }
+
         if (hasAdminRights) {
+          const pinBtn = document.createElement("button");
+          pinBtn.type = "button";
+          pinBtn.className = "ghost-btn";
+          pinBtn.textContent = answer.pinned ? t("unpin.action") : t("pin.action");
+          pinBtn.addEventListener("click", () => {
+            socket.emit("answer:pin", { questionId: question.id, answerId: answer.id, pinned: !Boolean(answer.pinned) });
+          });
+          top.appendChild(pinBtn);
+
           const delAnswer = document.createElement("button");
           delAnswer.type = "button";
           delAnswer.className = "danger-btn";
@@ -1505,11 +1655,15 @@
             alert(t("ui.reportSent"));
           });
           item.appendChild(reportCommentBtn);
+          item.appendChild(
+            renderReactionBar({ questionId: question.id, answerId: answer.id, commentId: comment.id, node: comment })
+          );
           list.appendChild(item);
         });
 
         wrapper.appendChild(top);
         wrapper.appendChild(text);
+        wrapper.appendChild(renderReactionBar({ questionId: question.id, answerId: answer.id, commentId: null, node: answer }));
         wrapper.appendChild(list);
 
         if (withCommentForm) {
@@ -1883,6 +2037,10 @@
     const answerText = document.getElementById("answer-text");
     bindCommunityWarning(answerForm);
     let currentQuestion = null;
+    const participationPanel = document.getElementById("participation-panel-live");
+    const participationTitle = document.getElementById("participation-title-live");
+    const participationBody = document.getElementById("participation-body-live");
+    const inviteBtn = document.getElementById("invite-btn-live");
 
     // PWA + Push notifications
     ensureServiceWorker().catch(() => {});
@@ -2041,6 +2199,7 @@
         renderQuestionMedia(null, questionMediaEl);
         if (shareBtn) shareBtn.hidden = true;
         answersList.textContent = "";
+        if (participationPanel) participationPanel.hidden = true;
         renderTypingIndicators();
         return;
       }
@@ -2049,6 +2208,16 @@
       }
       renderQuestionMedia(question, questionMediaEl);
       questionEl.textContent = textForLang(question);
+
+      if (participationPanel && participationTitle && participationBody) {
+        const count = (question?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
+        participationPanel.hidden = false;
+        participationTitle.textContent = count ? t("cta.title") : t("cta.emptyTitle");
+        participationBody.textContent = count ? t("cta.body") : t("cta.emptyBody");
+      }
+      if (inviteBtn) {
+        inviteBtn.onclick = () => inviteFriends(currentQuestion).catch(() => {});
+      }
       if (shareBtn) {
         shareBtn.hidden = false;
         shareBtn.onclick = () => {
@@ -2071,7 +2240,14 @@
         questionEl.textContent = t("ui.noActiveQuestion");
         renderQuestionMedia(null, questionMediaEl);
         answersList.textContent = "";
+        if (participationPanel) participationPanel.hidden = true;
         return;
+      }
+      if (participationPanel && participationTitle && participationBody) {
+        const count = (currentQuestion?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
+        participationPanel.hidden = false;
+        participationTitle.textContent = count ? t("cta.title") : t("cta.emptyTitle");
+        participationBody.textContent = count ? t("cta.body") : t("cta.emptyBody");
       }
       renderQuestionMedia(currentQuestion, questionMediaEl);
       questionEl.textContent = textForLang(currentQuestion);
@@ -2092,6 +2268,10 @@
     let selectedId = null;
     let historyItemsCache = [];
     let selectedQuestionCache = null;
+    const participationPanel = document.getElementById("participation-panel-history");
+    const participationTitle = document.getElementById("participation-title-history");
+    const participationBody = document.getElementById("participation-body-history");
+    const inviteBtn = document.getElementById("invite-btn-history");
 
     // PWA + Push notifications
     ensureServiceWorker().catch(() => {});
@@ -2205,6 +2385,15 @@
       selectedTitle.textContent = question.active ? t("ui.statusCurrent") : t("ui.statusArchived");
       renderQuestionMedia(question, selectedQuestionMedia);
       selectedQuestion.textContent = textForLang(question);
+      if (participationPanel && participationTitle && participationBody) {
+        const count = (question?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
+        participationPanel.hidden = false;
+        participationTitle.textContent = count ? t("cta.title") : t("cta.emptyTitle");
+        participationBody.textContent = count ? t("cta.body") : t("cta.emptyBody");
+      }
+      if (inviteBtn) {
+        inviteBtn.onclick = () => inviteFriends(selectedQuestionCache).catch(() => {});
+      }
       if (shareBtn) {
         shareBtn.hidden = false;
         shareBtn.onclick = () => {
@@ -2222,6 +2411,12 @@
     window.addEventListener("qday:lang-changed", () => {
       renderHistory(historyItemsCache);
       if (!selectedQuestionCache) return;
+      if (participationPanel && participationTitle && participationBody) {
+        const count = (selectedQuestionCache?.answers || []).filter((a) => normalizeLang(a?.lang) === currentLang).length;
+        participationPanel.hidden = false;
+        participationTitle.textContent = count ? t("cta.title") : t("cta.emptyTitle");
+        participationBody.textContent = count ? t("cta.body") : t("cta.emptyBody");
+      }
       renderQuestionMedia(selectedQuestionCache, selectedQuestionMedia);
       selectedQuestion.textContent = textForLang(selectedQuestionCache);
       renderAnswers(selectedQuestionCache, answersList, true);
