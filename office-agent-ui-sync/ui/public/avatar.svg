@@ -1,0 +1,24 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Homme en costume">
+  <defs>
+    <linearGradient id="bg" x1="22" y1="18" x2="140" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="suit" x1="54" y1="86" x2="112" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1224"/>
+      <stop offset="1" stop-color="#111B35"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="140" height="140" rx="30" fill="url(#bg)" stroke="rgba(255,255,255,0.16)"/>
+  <path d="M80 92c20 0 38 12 44 30 2 6-2 12-8 12H44c-6 0-10-6-8-12 6-18 24-30 44-30Z" fill="url(#suit)"/>
+  <path d="M60 104l20 18 20-18 10 12-10 28H60l-10-28 10-12Z" fill="rgba(255,255,255,0.05)"/>
+  <path d="M80 108l-10 10 10 24 10-24-10-10Z" fill="rgba(255,255,255,0.10)"/>
+  <path d="M80 106l10 12-10 8-10-8 10-12Z" fill="rgba(255,255,255,0.08)"/>
+  <path d="M58 114l18-20h8l18 20-22 12-22-12Z" fill="rgba(255,255,255,0.06)"/>
+  <path d="M80 88c-17 0-30-13-30-30s13-30 30-30 30 13 30 30-13 30-30 30Z" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.18)"/>
+  <path d="M57 56c4-14 16-24 23-24s19 10 23 24c-6-3-15-5-23-5s-17 2-23 5Z" fill="rgba(0,0,0,0.30)"/>
+  <circle cx="70" cy="60" r="4" fill="rgba(255,255,255,0.78)"/>
+  <circle cx="90" cy="60" r="4" fill="rgba(255,255,255,0.78)"/>
+  <path d="M72 72c6 5 10 5 16 0" stroke="rgba(255,255,255,0.55)" stroke-width="4" stroke-linecap="round"/>
+</svg>
+

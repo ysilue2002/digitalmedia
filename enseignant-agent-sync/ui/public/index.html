@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enseignant — Agent IA</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <img class="logo" src="/public/logo.svg" alt="Enseignant" />
+        <div>
+          <div class="name">Enseignant</div>
+          <div class="tag">Préparation de cours (CI) · APC · Andragogie · Export Word/PDF/PPT</div>
+        </div>
+      </div>
+      <div class="langs">FR · EN · DE · ES</div>
+    </header>
+
+    <main class="wrap">
+      <section class="card">
+        <h2>1) Paramètres</h2>
+        <div class="grid">
+          <label>
+            Niveau
+            <select id="level">
+              <option value="primaire">Primaire</option>
+              <option value="college">Collège</option>
+              <option value="lycee">Lycée</option>
+              <option value="universite">Université</option>
+              <option value="pro">Technique/Pro</option>
+            </select>
+          </label>
+          <label>
+            Langue
+            <select id="language">
+              <option value="fr">Français</option>
+              <option value="en">Anglais</option>
+              <option value="de">Allemand</option>
+              <option value="es">Espagnol</option>
+            </select>
+          </label>
+          <label>
+            Durée (minutes)
+            <input id="durationMin" type="number" value="55" min="20" max="240" />
+          </label>
+          <label>
+            Méthodologie (optionnel)
+            <input id="methodology" type="text" placeholder="APC, andragogie, classe inversée…" />
+          </label>
+          <label class="wide">
+            Matière / Module
+            <input id="subject" type="text" placeholder="Ex: Français, Maths, SVT, Réseaux, Comptabilité…" />
+          </label>
+          <label class="wide">
+            Thème / Leçon
+            <input id="topic" type="text" placeholder="Ex: Le présent de l'indicatif / Loi d'Ohm / DNS…" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2) Templates (optionnel)</h2>
+        <p class="muted">
+          Si tu fournis un modèle Word/PPT, l’agent tente de respecter la forme via des placeholders (ex: <code>{{TITLE}}</code>,
+          <code>{{OBJECTIVES}}</code>, <code>{{IMAGE_1}}</code>).
+        </p>
+        <div class="grid">
+          <label>
+            Template Word (.docx)
+            <input id="wordTemplate" type="file" accept=".docx" />
+          </label>
+          <label>
+            Template PowerPoint (.pptx)
+            <input id="pptTemplate" type="file" accept=".pptx" />
+          </label>
+          <label class="wide">
+            Sources web (URLs, séparées par espaces) — optionnel
+            <input id="urls" type="text" placeholder="https://... https://..." />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3) Sorties</h2>
+        <div class="row">
+          <label class="check"><input id="wantWord" type="checkbox" checked /> Word (.docx)</label>
+          <label class="check"><input id="wantPdf" type="checkbox" checked /> PDF</label>
+          <label class="check"><input id="wantPpt" type="checkbox" /> PowerPoint (.pptx)</label>
+          <label class="check"><input id="useImages" type="checkbox" checked /> Images (Wikimedia)</label>
+          <div class="spacer"></div>
+          <button id="generate" class="btn primary">Générer</button>
+        </div>
+        <div id="status" class="status">Prêt</div>
+      </section>
+
+      <section class="card">
+        <h2>Résultat</h2>
+        <pre id="result" class="pre"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Fichiers</h2>
+        <button id="refresh" class="btn">Rafraîchir</button>
+        <div id="outputs" class="outputs"></div>
+      </section>
+    </main>
+
+    <script src="/public/app.js"></script>
+  </body>
+</html>
+

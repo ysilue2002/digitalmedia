@@ -1,0 +1,15 @@
+{
+  "name": "enseignant-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agent IA 'Enseignant' (CI) : préparation de cours + export Word/PDF/PPT",
+  "main": "ui/server.js",
+  "scripts": {
+    "ui": "node ui/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^2.0.2"
+  }
+}
+

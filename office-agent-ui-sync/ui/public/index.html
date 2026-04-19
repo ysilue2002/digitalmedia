@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SYM_AI Agent</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <header class="top">
+      <div class="brand">
+        <img class="logo" src="/public/logo.svg" alt="SYM_AI Agent" />
+        <div class="brandText">
+          <div class="name">SYM_AI Agent</div>
+          <div class="tag">Interface locale pour piloter ton agent</div>
+        </div>
+      </div>
+      <div class="avatarWrap" title="Homme en costume">
+        <img class="avatar" src="/public/avatar.svg" alt="Homme en costume" />
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <h2>Mode A — Instruction</h2>
+        <p class="muted">Tu peux dicter avec la dictée Windows, puis coller ici.</p>
+        <textarea id="instruction" rows="5" placeholder='Ex: "Lis mes mails non lus et exporte en JSON"'></textarea>
+        <div class="row">
+          <label class="check">
+            <input id="allowAbs" type="checkbox" />
+            Autoriser chemins absolus (PDF)
+          </label>
+          <div class="spacer"></div>
+          <button id="planBtn" class="btn">Plan</button>
+          <button id="runBtn" class="btn primary">Exécuter</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Mode B — Tâches JSON</h2>
+        <div class="row">
+          <select id="examples"></select>
+          <button id="loadExample" class="btn">Charger</button>
+          <div class="spacer"></div>
+          <button id="planJsonBtn" class="btn">Plan</button>
+          <button id="runJsonBtn" class="btn primary">Exécuter</button>
+        </div>
+        <textarea id="taskJson" rows="10" spellcheck="false" placeholder="Colle ici une tâche JSON…"></textarea>
+      </section>
+
+      <section class="card wide">
+        <h2>Résultat</h2>
+        <div class="row">
+          <button id="refreshOut" class="btn">Rafraîchir outputs</button>
+          <div class="spacer"></div>
+          <span id="status" class="pill">Prêt</span>
+        </div>
+        <pre id="result" class="pre"></pre>
+        <div class="outputs">
+          <div class="outputsHead">Fichiers générés</div>
+          <div id="outputsList" class="outputsList"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span class="muted">Local only · 127.0.0.1</span>
+    </footer>
+
+    <script src="/public/app.js"></script>
+  </body>
+</html>
+

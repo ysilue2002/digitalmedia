@@ -1,0 +1,12 @@
+{
+  "name": "office-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Office automation agent (Word/Excel/PowerPoint/Outlook) driven by JSON tasks",
+  "main": "agent/run-agent.js",
+  "scripts": {
+    "run": "node agent/run-agent.js",
+    "ui": "node ui/server.js"
+  }
+}
+
