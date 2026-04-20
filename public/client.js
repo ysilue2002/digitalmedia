@@ -7,6 +7,15 @@
   let currentLang = localStorage.getItem("lang") || DEFAULT_LANG;
   if (isAdminPseudo) currentLang = DEFAULT_LANG;
   if (!SUPPORTED_LANGS.includes(currentLang)) currentLang = DEFAULT_LANG;
+  try {
+    const qsLang = String(new URLSearchParams(window.location.search || "").get("lang") || "")
+      .trim()
+      .toLowerCase();
+    if (!isAdminPseudo && SUPPORTED_LANGS.includes(qsLang)) {
+      currentLang = qsLang;
+      localStorage.setItem("lang", qsLang);
+    }
+  } catch {}
   // PWA install + push need SW on the pages that support it; safe to attempt early.
   // ensureServiceWorker is a function declaration (hoisted).
   ensureServiceWorker().catch(() => {});
@@ -1009,17 +1018,19 @@
 
   async function inviteFriends(question) {
     const q = textForLang(question) || t("live.currentQuestion");
-    const url = window.location.origin.endsWith("/") ? window.location.origin : `${window.location.origin}/`;
+    const shareUrl = `${window.location.origin}/share?q=${encodeURIComponent(question?.id || "")}&lang=${encodeURIComponent(
+      currentLang
+    )}`;
     const text =
       `${t("share.header")}\n` +
       `"${q}"\n` +
       `${t("share.prompt")}\n` +
       `${t("share.flow")}\n` +
-      `${t("share.join")} ${url}\n` +
+      `${t("share.join")} ${shareUrl}\n` +
       `#QDAY #QuestionDuJour #Debat`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: t("share.header"), text, url });
+        await navigator.share({ title: t("share.header"), text, url: shareUrl });
         return;
       } catch {}
     }
@@ -1483,18 +1494,18 @@
   async function shareQuestion(question, mode = "live") {
     if (!question?.id) return;
     const activeQuestion = textForLang(question) || t("live.currentQuestion");
-    const url = window.location.origin.endsWith("/") ? window.location.origin : `${window.location.origin}/`;
+    const shareUrl = `${window.location.origin}/share?q=${encodeURIComponent(question.id)}&lang=${encodeURIComponent(currentLang)}`;
     const text =
       `${t("share.header")}\n` +
       `"${activeQuestion}"\n` +
       `${t("share.prompt")}\n` +
       `${t("share.flow")}\n` +
-      `${t("share.join")} ${url}\n` +
+      `${t("share.join")} ${shareUrl}\n` +
       `#QDAY #QuestionDuJour #Debat`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: t("share.header"), text, url });
+        await navigator.share({ title: t("share.header"), text, url: shareUrl });
         return;
       } catch {}
     }
@@ -2532,10 +2543,15 @@
 
     socket.on("history:list", (items) => {
       historyItemsCache = Array.isArray(items) ? items : [];
-      const hashId = decodeURIComponent((window.location.hash || "").replace(/^#q=/, "").trim());
-      if (hashId && historyItemsCache.some((item) => item.id === hashId)) {
-        selectedId = hashId;
+      let queryId = "";
+      try {
+        queryId = decodeURIComponent(String(new URLSearchParams(window.location.search || "").get("q") || "").trim());
+      } catch {
+        queryId = "";
       }
+      const hashId = decodeURIComponent((window.location.hash || "").replace(/^#q=/, "").trim());
+      const requestedId = queryId || hashId;
+      if (requestedId && historyItemsCache.some((item) => item.id === requestedId)) selectedId = requestedId;
       renderHistory(items);
       if (!selectedId && items.length) {
         selectedId = items[0].id;
