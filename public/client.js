@@ -1073,7 +1073,8 @@
       video.src = asset.url;
       video.controls = true;
       video.playsInline = true;
-      video.preload = "metadata";
+      video.preload = "auto";
+      video.muted = true;
       container.appendChild(video);
     }
   }

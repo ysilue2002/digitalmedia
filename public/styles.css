@@ -355,6 +355,7 @@ button:hover {
   display: block;
   width: 100%;
   height: auto;
+  min-height: 200px;
   max-height: 520px;
   object-fit: contain;
   background: rgba(12, 18, 28, 0.85);

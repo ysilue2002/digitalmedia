@@ -1,0 +1,152 @@
+diff --git a/server.js b/server.js
+index 9625478..448123e 100644
+--- a/server.js
++++ b/server.js
+@@ -224,6 +224,31 @@ app.get("/sw.js", (_req, res) => {
+   res.setHeader("Cache-Control", "no-cache");
+   return res.sendFile(path.join(PUBLIC_DIR, "sw.js"));
+ });
++
++function isLinkPreviewBot(req) {
++  const ua = String(req.headers["user-agent"] || "").toLowerCase();
++  // Common link preview fetchers (WhatsApp, Facebook, Twitter/X, Telegram, Discord, Slack, LinkedIn...)
++  return /whatsapp|facebookexternalhit|facebookcatalog|twitterbot|telegrambot|discordbot|slackbot|linkedinbot|embedly|vkshare|skypeuripreview|pinterest|bitlybot/.test(
++    ua
++  );
++}
++
++// For link previews, return dynamic OG/Twitter meta at the root URL without breaking the normal app.
++// Bots will see the "media of the day" card; real browsers still get the static `public/index.html`.
++app.get("/", (req, res, next) => {
++  if (!isLinkPreviewBot(req) && req.query?.preview !== "1") return next();
++
++  const store = loadStore();
++  const safeLang = sanitizeLang(req.query?.lang);
++  const qid = sanitizeShortText(req.query?.q).slice(0, 120);
++  const question = qid ? getQuestionById(store, qid) : getCurrentQuestion(store);
++  const isCurrent = Boolean(question && question.active);
++  const pageUrl = absoluteUrl(req, `/?q=${encodeURIComponent(question?.id || "")}&lang=${encodeURIComponent(safeLang)}`);
++  const targetUrl = isCurrent
++    ? absoluteUrl(req, `/live.html?lang=${encodeURIComponent(safeLang)}`)
++    : absoluteUrl(req, `/history.html?q=${encodeURIComponent(question?.id || "")}&lang=${encodeURIComponent(safeLang)}`);
++  return sendShareLandingPage(req, res, { safeLang, question, pageUrl, targetUrl });
++});
+ app.use(express.static(PUBLIC_DIR));
+ 
+ function parseCookies(rawCookie) {
+@@ -247,6 +272,24 @@ function getReqIp(req) {
+   return String(req.socket?.remoteAddress || "").slice(0, 80);
+ }
+ 
++function absoluteUrl(req, pathname) {
++  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "http").split(",")[0].trim() || "http";
++  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
++  if (!host) return pathname;
++  const base = `${proto}://${host}`;
++  if (pathname.startsWith("http://") || pathname.startsWith("https://")) return pathname;
++  return pathname.startsWith("/") ? `${base}${pathname}` : `${base}/${pathname}`;
++}
++
++function escapeHtml(value) {
++  return String(value || "")
++    .replaceAll("&", "&amp;")
++    .replaceAll("<", "&lt;")
++    .replaceAll(">", "&gt;")
++    .replaceAll('"', "&quot;")
++    .replaceAll("'", "&#39;");
++}
++
+ function getSocketIp(socket) {
+   const forwarded = socket.handshake?.headers?.["x-forwarded-for"];
+   if (typeof forwarded === "string" && forwarded.trim()) {
+@@ -1733,6 +1776,90 @@ app.get("/api/ads", (_req, res) => {
+   return res.json(ads);
+ });
+ 
++function sendShareLandingPage(req, res, { safeLang, question, pageUrl, targetUrl }) {
++  const questionText = question ? questionTextForLang(question, safeLang) : "";
++  const asset = question ? questionMediaForLang(question, safeLang) : null;
++  const baseTitle = pushTitleForLang(safeLang);
++  const shortQ = questionText.replace(/\s+/g, " ").trim().slice(0, 140);
++  const title = shortQ ? `${baseTitle} - ${shortQ}` : baseTitle;
++
++  const ogType = asset?.kind === "video" ? "video.other" : "website";
++  const ogVideoCard = absoluteUrl(req, "/og/video-card.png");
++  const ogTextCard = absoluteUrl(req, "/og/text-card.png");
++  const ogImage =
++    asset?.kind === "image"
++      ? absoluteUrl(req, asset.url)
++      : asset?.kind === "video"
++      ? ogVideoCard
++      : ogTextCard;
++  const ogVideo = asset?.kind === "video" ? absoluteUrl(req, asset.url) : null;
++  const ogVideoType = asset?.kind === "video" ? asset.mime || "video/mp4" : null;
++
++  const instructions =
++    safeLang === "en"
++      ? "Your take in 30 seconds. Nickname + answer + real debate."
++      : safeLang === "es"
++      ? "Tu opinion en 30 segundos. Alias + respuesta + debate directo."
++      : safeLang === "ar"
++      ? "Ï▒Ïú┘è┘â ┘ü┘è 30 Ï½Ïº┘å┘èÏ®. ÏºÏ│┘à ┘àÏ│Ï¬Ï╣ÏºÏ▒ + ÏÑÏ¼ÏºÏ¿Ï® + ┘å┘éÏºÏ┤ ┘àÏ¿ÏºÏ┤Ï▒."
++      : "Ton avis en 30 secondes. Pseudo + reponse + debat direct.";
++
++  const desc = `${questionText ? `"${questionText}" ` : ""}${instructions}`.trim().slice(0, 240);
++
++  // Keep cache low: previews should update when question changes.
++  res.setHeader("Cache-Control", "public, max-age=60");
++  res.setHeader("Content-Type", "text/html; charset=utf-8");
++  return res.send(
++    `<!doctype html>
++<html lang="${escapeHtml(safeLang)}">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <title>${escapeHtml(title)}</title>
++  <meta name="robots" content="noindex,nofollow" />
++  <meta property="og:site_name" content="QDAY" />
++  <meta property="og:title" content="${escapeHtml(title)}" />
++  <meta property="og:description" content="${escapeHtml(desc)}" />
++  <meta property="og:type" content="${escapeHtml(ogType)}" />
++  <meta property="og:url" content="${escapeHtml(pageUrl)}" />
++  <meta property="og:image" content="${escapeHtml(ogImage)}" />
++  <meta property="og:image:alt" content="QDAY" />
++  ${ogVideo ? `<meta property="og:video" content="${escapeHtml(ogVideo)}" />` : ""}
++  ${ogVideo ? `<meta property="og:video:secure_url" content="${escapeHtml(ogVideo)}" />` : ""}
++  ${ogVideoType ? `<meta property="og:video:type" content="${escapeHtml(ogVideoType)}" />` : ""}
++  ${ogVideo ? `<meta property="og:video:width" content="1280" />` : ""}
++  ${ogVideo ? `<meta property="og:video:height" content="720" />` : ""}
++  <meta name="twitter:card" content="summary_large_image" />
++  <meta name="twitter:title" content="${escapeHtml(title)}" />
++  <meta name="twitter:description" content="${escapeHtml(desc)}" />
++  <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
++  <link rel="icon" href="/icons/icon-192.png" />
++  <meta http-equiv="refresh" content="0; url=${escapeHtml(targetUrl)}" />
++</head>
++<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; padding:16px;">
++  <h1 style="margin:0 0 8px;">QDAY</h1>
++  <p style="margin:0 0 14px;">${escapeHtml(questionText || instructions)}</p>
++  <p style="margin:0;"><a href="${escapeHtml(targetUrl)}">Ouvrir QDAY</a></p>
++</body>
++</html>`
++  );
++}
++
++// Social share landing page with OG/Twitter meta tags (for link previews).
++app.get("/share", (req, res) => {
++  const store = loadStore();
++  const safeLang = sanitizeLang(req.query?.lang);
++  const qid = sanitizeShortText(req.query?.q).slice(0, 120);
++  const question = qid ? getQuestionById(store, qid) : getCurrentQuestion(store);
++  const isCurrent = Boolean(question && question.active);
++
++  const pageUrl = absoluteUrl(req, `/share?q=${encodeURIComponent(question?.id || "")}&lang=${encodeURIComponent(safeLang)}`);
++  const targetUrl = isCurrent
++    ? absoluteUrl(req, `/live.html?lang=${encodeURIComponent(safeLang)}`)
++    : absoluteUrl(req, `/history.html?q=${encodeURIComponent(question?.id || "")}&lang=${encodeURIComponent(safeLang)}`);
++  return sendShareLandingPage(req, res, { safeLang, question, pageUrl, targetUrl });
++});
++
+ app.get("/api/push/vapidPublicKey", (_req, res) => {
+   if (!pushEnabled) return res.status(503).json({ error: "Push desactive." });
+   return res.json({ publicKey: vapidPublicKeyRuntime });
