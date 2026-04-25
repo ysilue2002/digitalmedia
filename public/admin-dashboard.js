@@ -515,89 +515,93 @@
 
         questionForm.addEventListener("submit", async (e) => {
           e.preventDefault();
-          const texts = {
-            fr: questionTextFr.value.trim(),
-            en: questionTextEn.value.trim(),
-            es: questionTextEs.value.trim(),
-            ar: questionTextAr.value.trim(),
-          };
+          try {
+            const texts = {
+              fr: questionTextFr.value.trim(),
+              en: questionTextEn.value.trim(),
+              es: questionTextEs.value.trim(),
+              ar: questionTextAr.value.trim(),
+            };
 
-          const kinds = {
-            fr: (questionKindFr?.value || "text").toLowerCase(),
-            en: (questionKindEn?.value || "text").toLowerCase(),
-            es: (questionKindEs?.value || "text").toLowerCase(),
-            ar: (questionKindAr?.value || "text").toLowerCase(),
-          };
+            const kinds = {
+              fr: (questionKindFr?.value || "text").toLowerCase(),
+              en: (questionKindEn?.value || "text").toLowerCase(),
+              es: (questionKindEs?.value || "text").toLowerCase(),
+              ar: (questionKindAr?.value || "text").toLowerCase(),
+            };
 
-          for (const lang of ["fr", "en", "es", "ar"]) {
-            const mode = kinds[lang];
-            if (mode === "text") {
-              if (!texts[lang]) {
-                alert(`Langue ${lang.toUpperCase()}: la question texte est obligatoire (ou choisis image/video).`);
-                return;
-              }
-            } else if (mode === "image" || mode === "video") {
-              const els = getQuestionLangEls(lang);
-              const file = els?.input?.files?.[0] || null;
-              if (!file && !questionMediaAssetByLang[lang]) {
-                alert(`Langue ${lang.toUpperCase()}: choisis un fichier ${mode} (ou repasse en question texte).`);
-                return;
-              }
-              if (file) {
-                const err = validateFileAgainstMode(file, mode);
-                if (err) {
-                  alert(`Langue ${lang.toUpperCase()}: ${err}`);
+            for (const lang of ["fr", "en", "es", "ar"]) {
+              const mode = kinds[lang];
+              if (mode === "text") {
+                if (!texts[lang]) {
+                  alert(`Langue ${lang.toUpperCase()}: la question texte est obligatoire (ou choisis image/video).`);
                   return;
                 }
+              } else if (mode === "image" || mode === "video") {
+                const els = getQuestionLangEls(lang);
+                const file = els?.input?.files?.[0] || null;
+                if (!file && !questionMediaAssetByLang[lang]) {
+                  alert(`Langue ${lang.toUpperCase()}: choisis un fichier ${mode} (ou repasse en question texte).`);
+                  return;
+                }
+                if (file) {
+                  const err = validateFileAgainstMode(file, mode);
+                  if (err) {
+                    alert(`Langue ${lang.toUpperCase()}: ${err}`);
+                    return;
+                  }
+                }
+              } else {
+                alert(`Langue ${lang.toUpperCase()}: type de contenu invalide.`);
+                return;
               }
-            } else {
-              alert(`Langue ${lang.toUpperCase()}: type de contenu invalide.`);
-              return;
             }
-          }
 
-          const media = { fr: null, en: null, es: null, ar: null };
-          for (const lang of ["fr", "en", "es", "ar"]) {
-            const mode = kinds[lang];
-            if (mode === "image" || mode === "video") {
+            const media = { fr: null, en: null, es: null, ar: null };
+            for (const lang of ["fr", "en", "es", "ar"]) {
+              const mode = kinds[lang];
+              if (mode === "image" || mode === "video") {
+                const els = getQuestionLangEls(lang);
+                const file = els?.input?.files?.[0] || null;
+                if (file) {
+                  const asset = await uploadQuestionAsset(file);
+                  questionMediaAssetByLang[lang] = asset;
+                  media[lang] = { asset };
+                } else if (questionMediaAssetByLang[lang]) {
+                  media[lang] = { asset: questionMediaAssetByLang[lang] };
+                }
+              }
+            }
+
+            await api("/api/admin/questions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                texts,
+                media,
+                activateAt: questionActivateAt?.value ? toISOFromLocalInput(questionActivateAt.value) : null,
+              }),
+            });
+            questionTextFr.value = "";
+            questionTextEn.value = "";
+            questionTextEs.value = "";
+            questionTextAr.value = "";
+            if (questionKindFr) questionKindFr.value = "text";
+            if (questionKindEn) questionKindEn.value = "text";
+            if (questionKindEs) questionKindEs.value = "text";
+            if (questionKindAr) questionKindAr.value = "text";
+            ["fr", "en", "es", "ar"].forEach((lang) => {
               const els = getQuestionLangEls(lang);
-              const file = els?.input?.files?.[0] || null;
-              if (file) {
-                const asset = await uploadQuestionAsset(file);
-                questionMediaAssetByLang[lang] = asset;
-                media[lang] = { asset };
-              } else if (questionMediaAssetByLang[lang]) {
-                media[lang] = { asset: questionMediaAssetByLang[lang] };
-              }
-            }
+              if (els?.input) els.input.value = "";
+              questionMediaAssetByLang[lang] = null;
+              setQuestionMediaMeta(lang, "Aucun media selectionne.");
+              syncQuestionLangUI(lang);
+            });
+            if (questionActivateAt) questionActivateAt.value = "";
+            await refreshAll();
+          } catch (err) {
+            alert(err?.message || "Impossible d'ajouter la question.");
           }
-
-          await api("/api/admin/questions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              texts,
-              media,
-              activateAt: questionActivateAt?.value ? toISOFromLocalInput(questionActivateAt.value) : null,
-            }),
-          });
-          questionTextFr.value = "";
-          questionTextEn.value = "";
-          questionTextEs.value = "";
-          questionTextAr.value = "";
-          if (questionKindFr) questionKindFr.value = "text";
-          if (questionKindEn) questionKindEn.value = "text";
-          if (questionKindEs) questionKindEs.value = "text";
-          if (questionKindAr) questionKindAr.value = "text";
-          ["fr", "en", "es", "ar"].forEach((lang) => {
-            const els = getQuestionLangEls(lang);
-            if (els?.input) els.input.value = "";
-            questionMediaAssetByLang[lang] = null;
-            setQuestionMediaMeta(lang, "Aucun media selectionne.");
-            syncQuestionLangUI(lang);
-          });
-          if (questionActivateAt) questionActivateAt.value = "";
-          await refreshAll();
         });
       }
       if (adForm && adSlot && adTitle && adCopy && adStart && adEnd) {

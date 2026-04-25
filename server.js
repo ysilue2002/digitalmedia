@@ -1488,18 +1488,22 @@ app.get("/api/admin/questions", (req, res) => {
 
 app.post("/api/admin/questions", (req, res) => {
   if (!isAdminRequest(req)) return res.status(403).json({ error: "Acces admin requis." });
+  // Backward compatibility: old admin clients may still send a single `text` field.
+  const legacyText = sanitizeText(req.body?.text || req.body?.question || "");
   const rawTexts = req.body?.texts && typeof req.body.texts === "object" ? req.body.texts : null;
-  const texts = normalizeQuestionTexts(rawTexts);
+  const texts = normalizeQuestionTexts(rawTexts, legacyText);
   const rawMedia = req.body?.media && typeof req.body.media === "object" ? req.body.media : null;
   const media = normalizeQuestionMedia(rawMedia);
   const safeActivateAt = normalizeISODate(req.body?.activateAt);
   if (req.body?.activateAt && !safeActivateAt) {
+    writeAudit("admin.question_add.invalid_schedule", { ip: getReqIp(req), activateAt: String(req.body?.activateAt || "") });
     return res.status(400).json({ error: "Date de programmation invalide." });
   }
   const missing = SUPPORTED_LANGS.find((lang) => !questionHasContentForLang(texts, media, lang));
   if (missing) {
+    writeAudit("admin.question_add.missing_lang_content", { ip: getReqIp(req), missing });
     return res.status(400).json({
-      error: "Chaque langue doit contenir soit un texte soit un media (image ou video).",
+      error: `Contenu manquant pour la langue "${missing.toUpperCase()}": ajoute un texte ou un media.`,
     });
   }
   const store = loadStore();
