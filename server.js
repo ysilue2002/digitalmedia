@@ -38,6 +38,10 @@ const ERROR_ALERT_THRESHOLD_PER_MIN = Number(process.env.ERROR_ALERT_THRESHOLD_P
 const DATABASE_URL = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || "";
 const USE_REMOTE_DB = Boolean(DATABASE_URL) && process.env.NODE_ENV !== "test";
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 8000);
+const AD_ASSET_MAX_MB = Math.max(1, Number(process.env.AD_ASSET_MAX_MB || 30));
+const QUESTION_MEDIA_MAX_MB = Math.max(1, Number(process.env.QUESTION_MEDIA_MAX_MB || 100));
+const AD_ASSET_MAX_BYTES = Math.floor(AD_ASSET_MAX_MB * 1024 * 1024);
+const QUESTION_MEDIA_MAX_BYTES = Math.floor(QUESTION_MEDIA_MAX_MB * 1024 * 1024);
 const typingState = new Map();
 let appErrorCounter = 0;
 const runtimeUniqueVisitors = new Set();
@@ -1373,7 +1377,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 12 * 1024 * 1024, files: 1 },
+  limits: { fileSize: AD_ASSET_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     const ok = ALLOWED_UPLOAD_MIME.has(file.mimetype || "") && ALLOWED_EXTENSIONS.has(ext);
@@ -2008,7 +2012,7 @@ app.post("/api/admin/upload-ad-asset", (req, res) => {
 
 const uploadQuestionMedia = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+  limits: { fileSize: QUESTION_MEDIA_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     const ok = QUESTION_MEDIA_ALLOWED_MIME.has(file.mimetype || "") && QUESTION_MEDIA_ALLOWED_EXT.has(ext);
@@ -2045,10 +2049,18 @@ app.post("/api/admin/upload-question-media", (req, res) => {
   return res.json(asset);
 });
 
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   appErrorCounter += 1;
   writeAppLog("ERROR", "http.error", { message: err?.message || "unknown" });
-  if (err instanceof multer.MulterError || err?.message) {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      const isQuestionMediaRoute = String(req?.path || "").includes("/api/admin/upload-question-media");
+      const maxMb = isQuestionMediaRoute ? QUESTION_MEDIA_MAX_MB : AD_ASSET_MAX_MB;
+      return res.status(400).json({ error: `Fichier trop volumineux. Taille max: ${maxMb} Mo.` });
+    }
+    return res.status(400).json({ error: sanitizeText(err.message || "Requete invalide.") });
+  }
+  if (err?.message) {
     return res.status(400).json({ error: sanitizeText(err.message || "Requete invalide.") });
   }
   return res.status(500).json({ error: "Erreur serveur." });
