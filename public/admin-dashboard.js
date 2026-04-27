@@ -61,8 +61,13 @@
     sort: "date_desc",
   };
 
+  function apiUrl(path) {
+    // Always build absolute same-origin API URLs to avoid relative-resolution edge cases.
+    return new URL(path, window.location.origin).toString();
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch(path, options);
+    const res = await fetch(apiUrl(path), options);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Erreur API" }));
       throw new Error(err.error || "Erreur API");
@@ -233,7 +238,7 @@
   async function uploadAdAsset(file) {
     const formData = new FormData();
     formData.append("asset", file);
-    const res = await fetch("/api/admin/upload-ad-asset", {
+    const res = await fetch(apiUrl("/api/admin/upload-ad-asset"), {
       method: "POST",
       body: formData,
     });
@@ -247,7 +252,7 @@
   async function uploadQuestionAsset(file) {
     const formData = new FormData();
     formData.append("asset", file);
-    const res = await fetch("/api/admin/upload-question-media", {
+    const res = await fetch(apiUrl("/api/admin/upload-question-media"), {
       method: "POST",
       body: formData,
     });

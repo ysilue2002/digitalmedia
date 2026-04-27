@@ -2306,7 +2306,10 @@
         if (selectedFile) {
           const formData = new FormData();
           formData.append("asset", selectedFile);
-          const response = await fetch("/api/admin/upload-ad-asset", { method: "POST", body: formData });
+          const response = await fetch(new URL("/api/admin/upload-ad-asset", window.location.origin).toString(), {
+            method: "POST",
+            body: formData,
+          });
           if (!response.ok) {
             const err = await response.json().catch(() => ({ error: "Erreur upload media." }));
             alert(err.error || "Erreur upload media.");
