@@ -263,6 +263,79 @@
     return res.json();
   }
 
+  async function extractVideoPosterBlob(file) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      const objectUrl = URL.createObjectURL(file);
+      video.preload = "metadata";
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = "anonymous";
+      video.src = objectUrl;
+
+      const cleanup = () => {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {}
+      };
+
+      video.onloadedmetadata = () => {
+        const targetTime = Math.min(1, Math.max(0.1, Number(video.duration || 0) / 2 || 0.1));
+        try {
+          video.currentTime = targetTime;
+        } catch {
+          video.currentTime = 0;
+        }
+      };
+
+      video.onseeked = () => {
+        try {
+          const srcW = Number(video.videoWidth || 0);
+          const srcH = Number(video.videoHeight || 0);
+          if (!srcW || !srcH) {
+            cleanup();
+            reject(new Error("Impossible de lire la video pour la miniature."));
+            return;
+          }
+          const maxW = 1280;
+          const ratio = srcW / srcH;
+          const outW = Math.min(maxW, srcW);
+          const outH = Math.max(1, Math.round(outW / ratio));
+          const canvas = document.createElement("canvas");
+          canvas.width = outW;
+          canvas.height = outH;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            cleanup();
+            reject(new Error("Canvas indisponible pour la miniature."));
+            return;
+          }
+          ctx.drawImage(video, 0, 0, outW, outH);
+          canvas.toBlob(
+            (blob) => {
+              cleanup();
+              if (!blob) {
+                reject(new Error("Echec generation miniature."));
+                return;
+              }
+              resolve(blob);
+            },
+            "image/jpeg",
+            0.82
+          );
+        } catch (e) {
+          cleanup();
+          reject(e instanceof Error ? e : new Error("Echec generation miniature."));
+        }
+      };
+
+      video.onerror = () => {
+        cleanup();
+        reject(new Error("Video invalide pour generation de miniature."));
+      };
+    });
+  }
+
   function setQuestionMediaMeta(lang, text) {
     const map = { fr: questionMediaMetaFr, en: questionMediaMetaEn, es: questionMediaMetaEs, ar: questionMediaMetaAr };
     const el = map[lang];
@@ -570,6 +643,14 @@
                 const file = els?.input?.files?.[0] || null;
                 if (file) {
                   const asset = await uploadQuestionAsset(file);
+                  if (mode === "video") {
+                    try {
+                      const posterBlob = await extractVideoPosterBlob(file);
+                      const posterFile = new File([posterBlob], `poster-${Date.now()}.jpg`, { type: "image/jpeg" });
+                      const posterAsset = await uploadQuestionAsset(posterFile);
+                      if (posterAsset?.url) asset.posterUrl = posterAsset.url;
+                    } catch {}
+                  }
                   questionMediaAssetByLang[lang] = asset;
                   media[lang] = { asset };
                 } else if (questionMediaAssetByLang[lang]) {

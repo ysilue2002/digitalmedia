@@ -501,6 +501,7 @@ function normalizeQuestionMedia(input) {
     const mime = sanitizeShortText(asset.mime).slice(0, 100);
     const kind = sanitizeShortText(asset.kind);
     const size = Number.isFinite(Number(asset.size)) ? Number(asset.size) : 0;
+    const posterUrl = sanitizeText(asset.posterUrl || "").slice(0, 300);
     if (!url.startsWith("/uploads/")) {
       out[lang] = null;
       return;
@@ -520,6 +521,7 @@ function normalizeQuestionMedia(input) {
         mime: mime || "application/octet-stream",
         kind,
         size: size > 0 ? size : 0,
+        posterUrl: posterUrl.startsWith("/uploads/") ? posterUrl : null,
       },
     };
   });
@@ -1045,6 +1047,8 @@ function getReferencedUploadSet(store) {
     SUPPORTED_LANGS.forEach((lang) => {
       const filename = extractUploadFilenameFromUrl(media?.[lang]?.asset?.url);
       if (filename) refs.add(filename);
+      const posterFilename = extractUploadFilenameFromUrl(media?.[lang]?.asset?.posterUrl);
+      if (posterFilename) refs.add(posterFilename);
     });
   });
   return refs;
@@ -1618,7 +1622,10 @@ app.delete("/api/admin/questions/:id", (req, res) => {
   const victimMedia = normalizeQuestionMedia(victim?.media);
   SUPPORTED_LANGS.forEach((lang) => {
     const asset = victimMedia?.[lang]?.asset;
-    if (asset) deleteAssetFile(asset);
+    if (asset) {
+      deleteAssetFile(asset);
+      if (asset.posterUrl) deleteAssetFile({ url: asset.posterUrl });
+    }
   });
   if (!store.questions.some((q) => q.active) && store.questions.length > 0) {
     store.questions[0].active = true;
@@ -1798,7 +1805,9 @@ function sendShareLandingPage(req, res, { safeLang, question, pageUrl, targetUrl
     asset?.kind === "image"
       ? absoluteUrl(req, asset.url)
       : asset?.kind === "video"
-      ? ogVideoCard
+      ? asset?.posterUrl
+        ? absoluteUrl(req, asset.posterUrl)
+        : ogVideoCard
       : ogTextCard;
   const ogVideo = asset?.kind === "video" ? absoluteUrl(req, asset.url) : null;
   const ogVideoType = asset?.kind === "video" ? asset.mime || "video/mp4" : null;
